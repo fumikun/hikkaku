@@ -1,6 +1,6 @@
-import { fromPrimitiveSource } from "../compiler/block-helper"
-import type { PrimitiveSource, VariableReference } from "../compiler/types"
-import { block, substack } from "../compiler/composer"
+import { fromPrimitiveSource } from '../compiler/block-helper'
+import { block, substack } from '../compiler/composer'
+import type { PrimitiveSource, VariableReference } from '../compiler/types'
 
 export type StopOption =
   | 'all'
@@ -8,104 +8,103 @@ export type StopOption =
   | 'other scripts in sprite'
   | 'other scripts in stage'
 
-export const repeat = (
-  times: PrimitiveSource<number>,
-  handler: () => void
-) => {
+export const repeat = (times: PrimitiveSource<number>, handler: () => void) => {
   const substackId = substack(handler)
   return block('control_repeat', {
     inputs: {
       TIMES: fromPrimitiveSource(times),
-      ...(substackId ? { SUBSTACK: [2, substackId] } : {})
-    }
+      ...(substackId ? { SUBSTACK: [2, substackId] } : {}),
+    },
   })
 }
 
 export const repeatUntil = (
   condition: PrimitiveSource<boolean>,
-  handler: () => void
+  handler: () => void,
 ) => {
   const substackId = substack(handler)
   return block('control_repeat_until', {
     inputs: {
       CONDITION: fromPrimitiveSource(condition),
-      ...(substackId ? { SUBSTACK: [2, substackId] } : {})
-    }
+      ...(substackId ? { SUBSTACK: [2, substackId] } : {}),
+    },
   })
 }
 
 export const repeatWhile = (
   condition: PrimitiveSource<boolean>,
-  handler: () => void
+  handler: () => void,
 ) => {
   const substackId = substack(handler)
   return block('control_while', {
     inputs: {
       CONDITION: fromPrimitiveSource(condition),
-      ...(substackId ? { SUBSTACK: [2, substackId] } : {})
-    }
+      ...(substackId ? { SUBSTACK: [2, substackId] } : {}),
+    },
   })
 }
 
 export const forEach = (
   variable: VariableReference,
   value: PrimitiveSource<number>,
-  handler: () => void
+  handler: () => void,
 ) => {
   const substackId = substack(handler)
   return block('control_for_each', {
     inputs: {
       VALUE: fromPrimitiveSource(value),
-      ...(substackId ? { SUBSTACK: [2, substackId] } : {})
+      ...(substackId ? { SUBSTACK: [2, substackId] } : {}),
     },
     fields: {
-      VARIABLE: [variable.name, variable.id]
-    }
+      VARIABLE: [variable.name, variable.id],
+    },
   })
 }
 
 export const forever = (handler: () => void) => {
   const substackId = substack(handler)
   return block('control_forever', {
-    inputs: substackId ? {
-      SUBSTACK: [2, substackId]
-    } : {}
+    inputs: substackId
+      ? {
+          SUBSTACK: [2, substackId],
+        }
+      : {},
   })
 }
 
 export const wait = (seconds: PrimitiveSource<number>) => {
   return block('control_wait', {
     inputs: {
-      DURATION: fromPrimitiveSource(seconds)
-    }
+      DURATION: fromPrimitiveSource(seconds),
+    },
   })
 }
 
 export const waitUntil = (condition: PrimitiveSource<boolean>) => {
   return block('control_wait_until', {
     inputs: {
-      CONDITION: fromPrimitiveSource(condition)
-    }
+      CONDITION: fromPrimitiveSource(condition),
+    },
   })
 }
 
 export const ifThen = (
   condition: PrimitiveSource<boolean>,
-  handler: () => void
+  handler: () => void,
 ) => {
   const substackId = substack(handler)
   return block('control_if', {
     inputs: {
       CONDITION: fromPrimitiveSource(condition),
-      ...(substackId ? { SUBSTACK: [2, substackId] } : {})
-    }
+      ...(substackId ? { SUBSTACK: [2, substackId] } : {}),
+    },
   })
 }
 
 export const ifElse = (
   condition: PrimitiveSource<boolean>,
   thenHandler: () => void,
-  elseHandler: () => void
+  elseHandler: () => void,
 ) => {
   const thenSubstackId = substack(thenHandler)
   const elseSubstackId = substack(elseHandler)
@@ -113,24 +112,24 @@ export const ifElse = (
     inputs: {
       CONDITION: fromPrimitiveSource(condition),
       ...(thenSubstackId ? { SUBSTACK: [2, thenSubstackId] } : {}),
-      ...(elseSubstackId ? { SUBSTACK2: [2, elseSubstackId] } : {})
-    }
+      ...(elseSubstackId ? { SUBSTACK2: [2, elseSubstackId] } : {}),
+    },
   })
 }
 
 export const stop = (option: StopOption) => {
   return block('control_stop', {
     fields: {
-      STOP_OPTION: [option, null]
-    }
+      STOP_OPTION: [option, null],
+    },
   })
 }
 
 export const createClone = (target: string) => {
   return block('control_create_clone_of', {
     fields: {
-      CLONE_OPTION: [target, null]
-    }
+      CLONE_OPTION: [target, null],
+    },
   })
 }
 
@@ -153,8 +152,10 @@ export const clearCounter = () => {
 export const allAtOnce = (handler: () => void) => {
   const substackId = substack(handler)
   return block('control_all_at_once', {
-    inputs: substackId ? {
-      SUBSTACK: [2, substackId]
-    } : {}
+    inputs: substackId
+      ? {
+          SUBSTACK: [2, substackId],
+        }
+      : {},
   })
 }

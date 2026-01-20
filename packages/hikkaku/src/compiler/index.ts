@@ -1,13 +1,6 @@
-
 export class Target {
-  onFlagClicked () {
-  }
-} 
+  onFlagClicked() {}
+}
 export class Compiler {
-  constructor () {
-
-  }
-  createTarget (name: string){
-
-  }
+  createTarget(_name: string) {}
 }

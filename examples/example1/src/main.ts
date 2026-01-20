@@ -1,36 +1,38 @@
-import { changeXBy, gotoXY, moveSteps, setX } from "hikkaku/blocks/motion";
-import { add } from "hikkaku/blocks/operator";
-import { Project } from "hikkaku/compiler/project";
-import { whenFlagClicked } from "hikkaku/blocks/events";
-import { ASSET_CAT1, ASSET_CAT2 } from "hikkaku/utils/assets";
-import { forever } from "hikkaku/blocks/control";
-import { getMouseX } from "hikkaku/blocks/sensing";
-import { switchCostumeTo } from "hikkaku/blocks/looks";
+import { ASSET_CAT1, ASSET_CAT2, Project } from 'hikkaku'
+import {
+  argumentReporterBoolean,
+  defineProcedure,
+  getMouseX,
+  gotoXY,
+  procedureBoolean,
+  procedureLabel,
+} from 'hikkaku/blocks'
 
 const project = new Project()
 
 const sprite1 = project.createSprite('スプライト1')
 
-const cat3 = sprite1.addCostume({
+const _cat3 = sprite1.addCostume({
   name: 'cat3',
   assetId: ASSET_CAT1,
-  dataFormat: 'svg'
+  dataFormat: 'svg',
 })
 
-const cat1 = sprite1.addCostume({
+const _cat1 = sprite1.addCostume({
   name: 'cat1',
   assetId: ASSET_CAT2,
-  dataFormat: 'svg'
+  dataFormat: 'svg',
 })
 
 sprite1.run(() => {
-  whenFlagClicked(() => {
-    switchCostumeTo(cat3)
-    forever(() => {
-      switchCostumeTo(cat1)
-      moveSteps(getMouseX())
-    })
-  })
+  defineProcedure(
+    [procedureLabel('Move to mouse pointer'), procedureBoolean('isFast')],
+    ({ isFast }) => {
+      argumentReporterBoolean(isFast)
+
+      gotoXY(getMouseX(), 0)
+    },
+  )
 })
 
 export default project

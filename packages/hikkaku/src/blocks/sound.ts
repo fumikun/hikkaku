@@ -1,22 +1,22 @@
-import { fromPrimitiveSource, fromSoundSource } from "../compiler/block-helper"
-import { block } from "../compiler/composer"
-import type { PrimitiveSource, SoundSource } from "../compiler/types"
+import { fromPrimitiveSource, fromSoundSource } from '../compiler/block-helper'
+import { block } from '../compiler/composer'
+import type { PrimitiveSource, SoundSource } from '../compiler/types'
 
 export type SoundEffect = 'pitch' | 'pan'
 
 export const playSound = (sound: SoundSource) => {
   return block('sound_play', {
     inputs: {
-      SOUND_MENU: fromSoundSource(sound)
-    }
+      SOUND_MENU: fromSoundSource(sound),
+    },
   })
 }
 
 export const playSoundUntilDone = (sound: SoundSource) => {
   return block('sound_playuntildone', {
     inputs: {
-      SOUND_MENU: fromSoundSource(sound)
-    }
+      SOUND_MENU: fromSoundSource(sound),
+    },
   })
 }
 
@@ -26,29 +26,29 @@ export const stopAllSounds = () => {
 
 export const setSoundEffectTo = (
   effect: SoundEffect,
-  value: PrimitiveSource<number>
+  value: PrimitiveSource<number>,
 ) => {
   return block('sound_seteffectto', {
     inputs: {
-      VALUE: fromPrimitiveSource(value)
+      VALUE: fromPrimitiveSource(value),
     },
     fields: {
-      EFFECT: [effect, null]
-    }
+      EFFECT: [effect, null],
+    },
   })
 }
 
 export const changeSoundEffectBy = (
   effect: SoundEffect,
-  value: PrimitiveSource<number>
+  value: PrimitiveSource<number>,
 ) => {
   return block('sound_changeeffectby', {
     inputs: {
-      VALUE: fromPrimitiveSource(value)
+      VALUE: fromPrimitiveSource(value),
     },
     fields: {
-      EFFECT: [effect, null]
-    }
+      EFFECT: [effect, null],
+    },
   })
 }
 
@@ -59,16 +59,16 @@ export const clearEffects = () => {
 export const setVolumeTo = (value: PrimitiveSource<number>) => {
   return block('sound_setvolumeto', {
     inputs: {
-      VOLUME: fromPrimitiveSource(value)
-    }
+      VOLUME: fromPrimitiveSource(value),
+    },
   })
 }
 
 export const changeVolumeBy = (value: PrimitiveSource<number>) => {
   return block('sound_changevolumeby', {
     inputs: {
-      VOLUME: fromPrimitiveSource(value)
-    }
+      VOLUME: fromPrimitiveSource(value),
+    },
   })
 }
 

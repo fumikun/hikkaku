@@ -1,6 +1,9 @@
-import { fromCostumeSource, fromPrimitiveSource } from "../compiler/block-helper"
-import { block } from "../compiler/composer"
-import type { CostumeSource, PrimitiveSource } from "../compiler/types"
+import {
+  fromCostumeSource,
+  fromPrimitiveSource,
+} from '../compiler/block-helper'
+import { block } from '../compiler/composer'
+import type { CostumeSource, PrimitiveSource } from '../compiler/types'
 
 export type LookEffect =
   | 'color'
@@ -18,40 +21,40 @@ export type NumberName = 'number' | 'name'
 export const say = (message: PrimitiveSource<string>) => {
   return block('looks_say', {
     inputs: {
-      MESSAGE: fromPrimitiveSource(message)
-    }
+      MESSAGE: fromPrimitiveSource(message),
+    },
   })
 }
 
 export const sayForSecs = (
   message: PrimitiveSource<string>,
-  seconds: PrimitiveSource<number>
+  seconds: PrimitiveSource<number>,
 ) => {
   return block('looks_sayforsecs', {
     inputs: {
       MESSAGE: fromPrimitiveSource(message),
-      SECS: fromPrimitiveSource(seconds)
-    }
+      SECS: fromPrimitiveSource(seconds),
+    },
   })
 }
 
 export const think = (message: PrimitiveSource<string>) => {
   return block('looks_think', {
     inputs: {
-      MESSAGE: fromPrimitiveSource(message)
-    }
+      MESSAGE: fromPrimitiveSource(message),
+    },
   })
 }
 
 export const thinkForSecs = (
   message: PrimitiveSource<string>,
-  seconds: PrimitiveSource<number>
+  seconds: PrimitiveSource<number>,
 ) => {
   return block('looks_thinkforsecs', {
     inputs: {
       MESSAGE: fromPrimitiveSource(message),
-      SECS: fromPrimitiveSource(seconds)
-    }
+      SECS: fromPrimitiveSource(seconds),
+    },
   })
 }
 
@@ -66,8 +69,8 @@ export const hide = () => {
 export const switchCostumeTo = (costume: CostumeSource) => {
   return block('looks_switchcostumeto', {
     inputs: {
-      COSTUME: fromCostumeSource(costume)
-    }
+      COSTUME: fromCostumeSource(costume),
+    },
   })
 }
 
@@ -78,16 +81,16 @@ export const nextCostume = () => {
 export const switchBackdropTo = (backdrop: PrimitiveSource<string>) => {
   return block('looks_switchbackdropto', {
     inputs: {
-      BACKDROP: fromPrimitiveSource(backdrop)
-    }
+      BACKDROP: fromPrimitiveSource(backdrop),
+    },
   })
 }
 
 export const switchBackdropToAndWait = (backdrop: PrimitiveSource<string>) => {
   return block('looks_switchbackdroptoandwait', {
     inputs: {
-      BACKDROP: fromPrimitiveSource(backdrop)
-    }
+      BACKDROP: fromPrimitiveSource(backdrop),
+    },
   })
 }
 
@@ -97,29 +100,29 @@ export const nextBackdrop = () => {
 
 export const changeLooksEffectBy = (
   effect: LookEffect,
-  value: PrimitiveSource<number>
+  value: PrimitiveSource<number>,
 ) => {
   return block('looks_changeeffectby', {
     inputs: {
-      CHANGE: fromPrimitiveSource(value)
+      CHANGE: fromPrimitiveSource(value),
     },
     fields: {
-      EFFECT: [effect, null]
-    }
+      EFFECT: [effect, null],
+    },
   })
 }
 
 export const setLooksEffectTo = (
   effect: LookEffect,
-  value: PrimitiveSource<number>
+  value: PrimitiveSource<number>,
 ) => {
   return block('looks_seteffectto', {
     inputs: {
-      VALUE: fromPrimitiveSource(value)
+      VALUE: fromPrimitiveSource(value),
     },
     fields: {
-      EFFECT: [effect, null]
-    }
+      EFFECT: [effect, null],
+    },
   })
 }
 
@@ -130,38 +133,38 @@ export const clearGraphicEffects = () => {
 export const changeSizeBy = (value: PrimitiveSource<number>) => {
   return block('looks_changesizeby', {
     inputs: {
-      CHANGE: fromPrimitiveSource(value)
-    }
+      CHANGE: fromPrimitiveSource(value),
+    },
   })
 }
 
 export const setSizeTo = (value: PrimitiveSource<number>) => {
   return block('looks_setsizeto', {
     inputs: {
-      SIZE: fromPrimitiveSource(value)
-    }
+      SIZE: fromPrimitiveSource(value),
+    },
   })
 }
 
 export const goToFrontBack = (position: FrontBack) => {
   return block('looks_gotofrontback', {
     fields: {
-      FRONT_BACK: [position, null]
-    }
+      FRONT_BACK: [position, null],
+    },
   })
 }
 
 export const goForwardBackwardLayers = (
   direction: ForwardBackward,
-  layers: PrimitiveSource<number>
+  layers: PrimitiveSource<number>,
 ) => {
   return block('looks_goforwardbackwardlayers', {
     inputs: {
-      NUM: fromPrimitiveSource(layers)
+      NUM: fromPrimitiveSource(layers),
     },
     fields: {
-      FORWARD_BACKWARD: [direction, null]
-    }
+      FORWARD_BACKWARD: [direction, null],
+    },
   })
 }
 
@@ -172,15 +175,15 @@ export const getSize = () => {
 export const getCostumeNumberName = (value: NumberName) => {
   return block('looks_costumenumbername', {
     fields: {
-      NUMBER_NAME: [value, null]
-    }
+      NUMBER_NAME: [value, null],
+    },
   })
 }
 
 export const getBackdropNumberName = (value: NumberName) => {
   return block('looks_backdropnumbername', {
     fields: {
-      NUMBER_NAME: [value, null]
-    }
+      NUMBER_NAME: [value, null],
+    },
   })
 }

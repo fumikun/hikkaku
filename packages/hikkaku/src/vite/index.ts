@@ -1,5 +1,5 @@
-import { createServerModuleRunner, type DevEnvironment, type PluginOption } from 'vite'
 import type * as sb3 from '@pnsk-lab/sb3-types'
+import { createServerModuleRunner, type PluginOption } from 'vite'
 
 const BASE_URL = 'https://scratchfoundation.github.io/scratch-gui/'
 
@@ -9,13 +9,24 @@ export interface HikkakuViteInit {
 export default function hikkaku(init: HikkakuViteInit): PluginOption {
   return {
     name: 'vite-plugin-hikkaku',
-    config(config, env) {
+    config() {
       return {
         environments: {
-          hikkaku: {
-          },
-          client: {}
-        }
+          hikkaku: {},
+          client: {},
+        },
+      }
+    },
+    resolveId(source) {
+      if (source === '/@virtual/hikkaku-client') {
+        return source
+      }
+    },
+    load(id) {
+      if (id === '/@virtual/hikkaku-client') {
+        return `
+          import 'hikkaku/client'
+        `
       }
     },
     async configureServer(server) {
@@ -31,11 +42,14 @@ export default function hikkaku(init: HikkakuViteInit): PluginOption {
 
       server.middlewares.use(async (req, res, next) => {
         if (req.url === '/') {
-          const html = (await fetch(BASE_URL).then(res => res.text()))
-            .replace('gui.js', 'https://scratchfoundation.github.io/scratch-gui/gui.js')
+          const html = (await fetch(BASE_URL).then((res) => res.text()))
+            .replace(
+              'gui.js',
+              'https://scratchfoundation.github.io/scratch-gui/gui.js',
+            )
             .replace(
               '</head>',
-              '<script src="/@vite/client" type="module"></script><script type="module">import "hikkaku/client"</script></head>'
+              '<script src="/@vite/client" type="module"></script><script type="module" src="/@virtual/hikkaku-client"></script></head>',
             )
           res.setHeader('Content-Type', 'text/html')
           res.end(html)
@@ -49,12 +63,15 @@ export default function hikkaku(init: HikkakuViteInit): PluginOption {
             res.end(`Error fetching ${url}: ${response.statusText}`)
             return
           }
-          res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream')
+          res.setHeader(
+            'Content-Type',
+            response.headers.get('content-type') || 'application/octet-stream',
+          )
           res.end(new Uint8Array(await response.arrayBuffer()))
           return
         }
         next()
       })
-    }
+    },
   }
 }

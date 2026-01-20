@@ -25,26 +25,28 @@ export interface BlockInit {
   fields?: Record<string, sb3.Fields>
   topLevel?: boolean
   mutation?: sb3.Mutation
+  isShadow?: boolean
 }
 export const block = (opcode: string, init: BlockInit): HikkakuBlock => {
   const ctx = getRootContext()
   const id = nextId()
-  const block = ctx.blocks[id] = {
+  const block = {
     opcode,
     inputs: init.inputs ?? {},
     fields: init.fields ?? {},
     mutation: init.mutation,
-    shadow: false,
+    shadow: init.isShadow ?? false,
     topLevel: init.topLevel ?? false,
     x: 0,
     y: 0,
     next: null,
     parent: null,
   }
+  ctx.blocks[id] = block
   ctx.blockToId.set(block, id)
 
   if (init.inputs) {
-    for (const [key, value] of Object.entries(init.inputs)) {
+    for (const [_key, value] of Object.entries(init.inputs)) {
       if (typeof value[1] === 'string') {
         const valueBlockId = value[1]
         const valueBlock = ctx.blocks[valueBlockId]
@@ -61,7 +63,8 @@ export const block = (opcode: string, init: BlockInit): HikkakuBlock => {
   }
 
   return {
-    id
+    isBlock: true,
+    id,
   }
 }
 
@@ -90,7 +93,10 @@ const applyNextAndParent = (blocks: sb3.Block[]) => {
     lastBlock = [blockId, block]
   }
 }
-const catchNewBlocks = (handler: Handler, catched: (id: string, block: sb3.Block) => void) => {
+const catchNewBlocks = (
+  handler: Handler,
+  catched: (id: string, block: sb3.Block) => void,
+) => {
   const ctx = getRootContext()
   const oldAdder = ctx.adder
   ctx.adder = (id: string, block: sb3.Block) => {

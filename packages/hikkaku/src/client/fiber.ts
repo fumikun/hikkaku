@@ -1,4 +1,4 @@
-import type { ScratchVM } from "./types"
+import type { ScratchVM } from './types'
 
 export const findDOMAppRoot = () => {
   const probably = [
@@ -50,19 +50,16 @@ const getAppFiberNode = (root: FiberNode): ScratchAppFiberNode => {
   }
   throw new Error('Could not find app fiber node.')
 }
-export const getScratchInternalStates = (
-  root: ScratchRoot,
-) => {
+export const getScratchInternalStates = (root: ScratchRoot) => {
   const rootContainer = root._reactRootContainer
   const rootFiberNode = rootContainer._internalRoot.current
   const appFiberNode = getAppFiberNode(rootFiberNode)
-
 
   const reduxState = appFiberNode.memoizedProps.store.getState()
   const vm = reduxState.scratchGui.vm
 
   return {
     reduxState,
-    vm
+    vm,
   }
 }
