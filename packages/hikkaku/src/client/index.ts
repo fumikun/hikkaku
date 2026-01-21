@@ -17,10 +17,10 @@ globalThis.hk = {
   getJSON: () => state.vm.toJSON(),
 }
 
-import.meta.hot?.on('hikkaku:project', (project: sb3.ScratchProject) => {
-  state.vm.loadProject(project)
-  console.log('Project loaded:', project)
+import.meta.hot?.on('hikkaku:project', async (project: sb3.ScratchProject) => {
+  await state.vm.loadProject(project)
+  
+  state.scratchBlocks.getMainWorkspace().cleanUp()
   setTimeout(() => {
-    state.scratchBlocks.getMainWorkspace().cleanUp()
-  }, 500)
+  }, 100)
 })
