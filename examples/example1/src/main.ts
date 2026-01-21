@@ -1,4 +1,5 @@
-import { ASSET_CAT1, ASSET_CAT2, Project } from 'hikkaku'
+import { Project } from 'hikkaku'
+import { ASSET_CAT1, ASSET_CAT2 } from 'hikkaku/assets'
 import {
   and,
   broadcast,
