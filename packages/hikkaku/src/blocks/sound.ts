@@ -111,7 +111,7 @@ export const setSoundEffectTo = (
  * ```ts
  * import { changeSoundEffectBy } from 'hikkaku/blocks'
  *
- * changeSoundEffectBy('pan', 10)
+ * changeSoundEffectBy('pitch', 10)
  * ```
  */
 export const changeSoundEffectBy = (
