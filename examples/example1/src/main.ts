@@ -1,18 +1,21 @@
 import { Project } from 'hikkaku'
-import { CATCHER_A } from 'hikkaku/assets'
+import { CAT_A } from 'hikkaku/assets'
+import { forever, moveSteps, whenFlagClicked } from 'hikkaku/blocks'
 
 const project = new Project()
 
-const _stage = project.stage
+const cat = project.createSprite('cat')
 
-//bconst player = project.createSprite('プレイヤー')
-const catCrowd = project.createSprite('ネコ軍団')
-
-const _catCostume = catCrowd.addCostume({
-  ...CATCHER_A,
-  name: 'cat',
+cat.addCostume({
+  ...CAT_A,
+  name: 'cat-a',
 })
-
-console.dir(project.toScratch(), { depth: null })
+cat.run(() => {
+  whenFlagClicked(() => {
+    forever(() => {
+      moveSteps(1)
+    })
+  })
+})
 
 export default project
