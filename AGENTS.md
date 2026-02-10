@@ -28,3 +28,8 @@
 ## Configuration & Security Notes
 - Keep dependency changes minimal and pinned to workspace scope.
 - Avoid adding secrets to the repo; use local `.env` files in examples if needed.
+
+## Commit
+
+* If you are Codex, use `Co-authored-by: chatgpt-codex-connector[bot] <199175422+chatgpt-codex-connector[bot]@users.noreply.github.com>` in the commit message to credit the human collaborator
+* You can use git command and gh command to commit, push and create PR.
