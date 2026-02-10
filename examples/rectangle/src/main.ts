@@ -92,7 +92,10 @@ pen.run(() => {
         setVariableTo(yMax, getVariable(y4))
       })
 
-      setVariableTo(scanSteps, add(subtract(getVariable(yMax), getVariable(yMin)), 1))
+      setVariableTo(
+        scanSteps,
+        add(subtract(getVariable(yMax), getVariable(yMin)), 1),
+      )
       setVariableTo(i, 0)
 
       repeat(getVariable(scanSteps), () => {
@@ -121,22 +124,43 @@ pen.run(() => {
           ),
           () => {
             setVariableTo(dy, subtract(getVariable(y2), getVariable(y1)))
-            setVariableTo(t, divide(subtract(getVariable(yScan), getVariable(y1)), getVariable(dy)))
+            setVariableTo(
+              t,
+              divide(
+                subtract(getVariable(yScan), getVariable(y1)),
+                getVariable(dy),
+              ),
+            )
             setVariableTo(dx, subtract(getVariable(x2), getVariable(x1)))
-            setVariableTo(xHit, add(getVariable(x1), multiply(getVariable(dx), getVariable(t))))
-            ifElse(equals(getVariable(count), 0), () => {
-              setVariableTo(ix1, getVariable(xHit))
-            }, () => {
-              ifElse(equals(getVariable(count), 1), () => {
-                setVariableTo(ix2, getVariable(xHit))
-              }, () => {
-                ifElse(equals(getVariable(count), 2), () => {
-                  setVariableTo(ix3, getVariable(xHit))
-                }, () => {
-                  setVariableTo(ix4, getVariable(xHit))
-                })
-              })
-            })
+            setVariableTo(
+              xHit,
+              add(getVariable(x1), multiply(getVariable(dx), getVariable(t))),
+            )
+            ifElse(
+              equals(getVariable(count), 0),
+              () => {
+                setVariableTo(ix1, getVariable(xHit))
+              },
+              () => {
+                ifElse(
+                  equals(getVariable(count), 1),
+                  () => {
+                    setVariableTo(ix2, getVariable(xHit))
+                  },
+                  () => {
+                    ifElse(
+                      equals(getVariable(count), 2),
+                      () => {
+                        setVariableTo(ix3, getVariable(xHit))
+                      },
+                      () => {
+                        setVariableTo(ix4, getVariable(xHit))
+                      },
+                    )
+                  },
+                )
+              },
+            )
             changeVariableBy(count, 1)
           },
         )
@@ -159,22 +183,43 @@ pen.run(() => {
           ),
           () => {
             setVariableTo(dy, subtract(getVariable(y3), getVariable(y2)))
-            setVariableTo(t, divide(subtract(getVariable(yScan), getVariable(y2)), getVariable(dy)))
+            setVariableTo(
+              t,
+              divide(
+                subtract(getVariable(yScan), getVariable(y2)),
+                getVariable(dy),
+              ),
+            )
             setVariableTo(dx, subtract(getVariable(x3), getVariable(x2)))
-            setVariableTo(xHit, add(getVariable(x2), multiply(getVariable(dx), getVariable(t))))
-            ifElse(equals(getVariable(count), 0), () => {
-              setVariableTo(ix1, getVariable(xHit))
-            }, () => {
-              ifElse(equals(getVariable(count), 1), () => {
-                setVariableTo(ix2, getVariable(xHit))
-              }, () => {
-                ifElse(equals(getVariable(count), 2), () => {
-                  setVariableTo(ix3, getVariable(xHit))
-                }, () => {
-                  setVariableTo(ix4, getVariable(xHit))
-                })
-              })
-            })
+            setVariableTo(
+              xHit,
+              add(getVariable(x2), multiply(getVariable(dx), getVariable(t))),
+            )
+            ifElse(
+              equals(getVariable(count), 0),
+              () => {
+                setVariableTo(ix1, getVariable(xHit))
+              },
+              () => {
+                ifElse(
+                  equals(getVariable(count), 1),
+                  () => {
+                    setVariableTo(ix2, getVariable(xHit))
+                  },
+                  () => {
+                    ifElse(
+                      equals(getVariable(count), 2),
+                      () => {
+                        setVariableTo(ix3, getVariable(xHit))
+                      },
+                      () => {
+                        setVariableTo(ix4, getVariable(xHit))
+                      },
+                    )
+                  },
+                )
+              },
+            )
             changeVariableBy(count, 1)
           },
         )
@@ -197,22 +242,43 @@ pen.run(() => {
           ),
           () => {
             setVariableTo(dy, subtract(getVariable(y4), getVariable(y3)))
-            setVariableTo(t, divide(subtract(getVariable(yScan), getVariable(y3)), getVariable(dy)))
+            setVariableTo(
+              t,
+              divide(
+                subtract(getVariable(yScan), getVariable(y3)),
+                getVariable(dy),
+              ),
+            )
             setVariableTo(dx, subtract(getVariable(x4), getVariable(x3)))
-            setVariableTo(xHit, add(getVariable(x3), multiply(getVariable(dx), getVariable(t))))
-            ifElse(equals(getVariable(count), 0), () => {
-              setVariableTo(ix1, getVariable(xHit))
-            }, () => {
-              ifElse(equals(getVariable(count), 1), () => {
-                setVariableTo(ix2, getVariable(xHit))
-              }, () => {
-                ifElse(equals(getVariable(count), 2), () => {
-                  setVariableTo(ix3, getVariable(xHit))
-                }, () => {
-                  setVariableTo(ix4, getVariable(xHit))
-                })
-              })
-            })
+            setVariableTo(
+              xHit,
+              add(getVariable(x3), multiply(getVariable(dx), getVariable(t))),
+            )
+            ifElse(
+              equals(getVariable(count), 0),
+              () => {
+                setVariableTo(ix1, getVariable(xHit))
+              },
+              () => {
+                ifElse(
+                  equals(getVariable(count), 1),
+                  () => {
+                    setVariableTo(ix2, getVariable(xHit))
+                  },
+                  () => {
+                    ifElse(
+                      equals(getVariable(count), 2),
+                      () => {
+                        setVariableTo(ix3, getVariable(xHit))
+                      },
+                      () => {
+                        setVariableTo(ix4, getVariable(xHit))
+                      },
+                    )
+                  },
+                )
+              },
+            )
             changeVariableBy(count, 1)
           },
         )
@@ -235,22 +301,43 @@ pen.run(() => {
           ),
           () => {
             setVariableTo(dy, subtract(getVariable(y1), getVariable(y4)))
-            setVariableTo(t, divide(subtract(getVariable(yScan), getVariable(y4)), getVariable(dy)))
+            setVariableTo(
+              t,
+              divide(
+                subtract(getVariable(yScan), getVariable(y4)),
+                getVariable(dy),
+              ),
+            )
             setVariableTo(dx, subtract(getVariable(x1), getVariable(x4)))
-            setVariableTo(xHit, add(getVariable(x4), multiply(getVariable(dx), getVariable(t))))
-            ifElse(equals(getVariable(count), 0), () => {
-              setVariableTo(ix1, getVariable(xHit))
-            }, () => {
-              ifElse(equals(getVariable(count), 1), () => {
-                setVariableTo(ix2, getVariable(xHit))
-              }, () => {
-                ifElse(equals(getVariable(count), 2), () => {
-                  setVariableTo(ix3, getVariable(xHit))
-                }, () => {
-                  setVariableTo(ix4, getVariable(xHit))
-                })
-              })
-            })
+            setVariableTo(
+              xHit,
+              add(getVariable(x4), multiply(getVariable(dx), getVariable(t))),
+            )
+            ifElse(
+              equals(getVariable(count), 0),
+              () => {
+                setVariableTo(ix1, getVariable(xHit))
+              },
+              () => {
+                ifElse(
+                  equals(getVariable(count), 1),
+                  () => {
+                    setVariableTo(ix2, getVariable(xHit))
+                  },
+                  () => {
+                    ifElse(
+                      equals(getVariable(count), 2),
+                      () => {
+                        setVariableTo(ix3, getVariable(xHit))
+                      },
+                      () => {
+                        setVariableTo(ix4, getVariable(xHit))
+                      },
+                    )
+                  },
+                )
+              },
+            )
             changeVariableBy(count, 1)
           },
         )

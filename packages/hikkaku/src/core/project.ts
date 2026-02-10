@@ -1,6 +1,6 @@
 import type * as sb3 from 'sb3-types'
 import { createBlocks } from './composer'
-import type { ListMonitor, Monitor, VariableMonitor } from './monitors'
+import type { Monitor } from './monitors'
 import {
   cloneMonitor,
   createListMonitor,
