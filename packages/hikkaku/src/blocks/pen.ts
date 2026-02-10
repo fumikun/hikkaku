@@ -8,24 +8,108 @@ export type PenColorParam =
   | 'brightness'
   | 'transparency'
 
+/**
+ * Clears all pen marks.
+ *
+ * Input: none.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { eraseAll } from 'hikkaku/blocks'
+ *
+ * eraseAll()
+ * ```
+ */
 export const eraseAll = () => {
   return block('pen_clear', {})
 }
 
+/**
+ * Alias for {@link eraseAll}.
+ *
+ * Input: none.
+ * Output: Same Scratch statement block definition as {@link eraseAll}.
+ *
+ * @example
+ * ```ts
+ * import { clear } from 'hikkaku/blocks'
+ *
+ * clear()
+ * ```
+ */
 export const clear = eraseAll
 
+/**
+ * Stamps sprite costume.
+ *
+ * Input: none.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { stamp } from 'hikkaku/blocks'
+ *
+ * stamp()
+ * ```
+ */
 export const stamp = () => {
   return block('pen_stamp', {})
 }
 
+/**
+ * Starts drawing.
+ *
+ * Input: none.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { penDown } from 'hikkaku/blocks'
+ *
+ * penDown()
+ * ```
+ */
 export const penDown = () => {
   return block('pen_penDown', {})
 }
 
+/**
+ * Stops drawing.
+ *
+ * Input: none.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { penUp } from 'hikkaku/blocks'
+ *
+ * penUp()
+ * ```
+ */
 export const penUp = () => {
   return block('pen_penUp', {})
 }
 
+/**
+ * Sets pen color.
+ *
+ * Input: `color`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param color See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setPenColorTo } from 'hikkaku/blocks'
+ *
+ * setPenColorTo(undefined as any)
+ * ```
+ */
 export const setPenColorTo = (color: PrimitiveSource<string>) => {
   return block('pen_setPenColorToColor', {
     inputs: {
@@ -34,8 +118,38 @@ export const setPenColorTo = (color: PrimitiveSource<string>) => {
   })
 }
 
+/**
+ * Alias for {@link setPenColorTo}.
+ *
+ * Input: `color`.
+ * Output: Same Scratch statement block definition as {@link setPenColorTo}.
+ *
+ * @param color See function signature for accepted input values.
+ * @example
+ * ```ts
+ * import { setPenColorToColor } from 'hikkaku/blocks'
+ *
+ * setPenColorToColor('#ff0000')
+ * ```
+ */
 export const setPenColorToColor = setPenColorTo
 
+/**
+ * Changes pen color parameter by amount.
+ *
+ * Input: `param`, `value`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param param See function signature for accepted input values.
+ * @param value See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { changePenColorParamBy } from 'hikkaku/blocks'
+ *
+ * changePenColorParamBy(undefined as any, 10)
+ * ```
+ */
 export const changePenColorParamBy = (
   param: PrimitiveSource<PenColorParam>,
   value: PrimitiveSource<number>,
@@ -48,6 +162,22 @@ export const changePenColorParamBy = (
   })
 }
 
+/**
+ * Sets pen color parameter to value.
+ *
+ * Input: `param`, `value`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param param See function signature for accepted input values.
+ * @param value See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setPenColorParamTo } from 'hikkaku/blocks'
+ *
+ * setPenColorParamTo(undefined as any, 10)
+ * ```
+ */
 export const setPenColorParamTo = (
   param: PrimitiveSource<PenColorParam>,
   value: PrimitiveSource<number>,
@@ -60,6 +190,21 @@ export const setPenColorParamTo = (
   })
 }
 
+/**
+ * Changes pen size by amount.
+ *
+ * Input: `size`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param size See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { changePenSizeBy } from 'hikkaku/blocks'
+ *
+ * changePenSizeBy(10)
+ * ```
+ */
 export const changePenSizeBy = (size: PrimitiveSource<number>) => {
   return block('pen_changePenSizeBy', {
     inputs: {
@@ -68,6 +213,21 @@ export const changePenSizeBy = (size: PrimitiveSource<number>) => {
   })
 }
 
+/**
+ * Sets pen size to value.
+ *
+ * Input: `size`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param size See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setPenSizeTo } from 'hikkaku/blocks'
+ *
+ * setPenSizeTo(10)
+ * ```
+ */
 export const setPenSizeTo = (size: PrimitiveSource<number>) => {
   return block('pen_setPenSizeTo', {
     inputs: {
@@ -76,6 +236,21 @@ export const setPenSizeTo = (size: PrimitiveSource<number>) => {
   })
 }
 
+/**
+ * Sets pen shade to value.
+ *
+ * Input: `shade`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param shade See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setPenShadeToNumber } from 'hikkaku/blocks'
+ *
+ * setPenShadeToNumber(10)
+ * ```
+ */
 export const setPenShadeToNumber = (shade: PrimitiveSource<number>) => {
   return block('pen_setPenShadeToNumber', {
     inputs: {
@@ -84,6 +259,21 @@ export const setPenShadeToNumber = (shade: PrimitiveSource<number>) => {
   })
 }
 
+/**
+ * Changes pen shade by amount.
+ *
+ * Input: `shade`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param shade See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { changePenShadeBy } from 'hikkaku/blocks'
+ *
+ * changePenShadeBy(10)
+ * ```
+ */
 export const changePenShadeBy = (shade: PrimitiveSource<number>) => {
   return block('pen_changePenShadeBy', {
     inputs: {
@@ -92,6 +282,21 @@ export const changePenShadeBy = (shade: PrimitiveSource<number>) => {
   })
 }
 
+/**
+ * Sets pen hue to value.
+ *
+ * Input: `hue`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param hue See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setPenHueToNumber } from 'hikkaku/blocks'
+ *
+ * setPenHueToNumber(10)
+ * ```
+ */
 export const setPenHueToNumber = (hue: PrimitiveSource<number>) => {
   return block('pen_setPenHueToNumber', {
     inputs: {
@@ -100,6 +305,21 @@ export const setPenHueToNumber = (hue: PrimitiveSource<number>) => {
   })
 }
 
+/**
+ * Changes pen hue by amount.
+ *
+ * Input: `hue`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param hue See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { changePenHueBy } from 'hikkaku/blocks'
+ *
+ * changePenHueBy(10)
+ * ```
+ */
 export const changePenHueBy = (hue: PrimitiveSource<number>) => {
   return block('pen_changePenHueBy', {
     inputs: {

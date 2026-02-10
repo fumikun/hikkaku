@@ -1,0 +1,15 @@
+{
+  "name": "skill",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build-blocks": "bun run scripts/build-blocks.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

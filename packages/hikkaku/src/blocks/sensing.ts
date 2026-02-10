@@ -2,9 +2,37 @@ import { fromPrimitiveSource } from '../core/block-helper'
 import { block, valueBlock } from '../core/composer'
 import type { PrimitiveSource } from '../core/types'
 
+/**
+ * Mouse position.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getMouseX } from 'hikkaku/blocks'
+ *
+ * getMouseX()
+ * ```
+ */
 export const getMouseX = () => {
   return valueBlock('sensing_mousex', {})
 }
+/**
+ * getMouseY block helper.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getMouseY } from 'hikkaku/blocks'
+ *
+ * getMouseY()
+ * ```
+ */
 export const getMouseY = () => {
   return valueBlock('sensing_mousey', {})
 }
@@ -19,6 +47,21 @@ export type CurrentMenu =
   | 'second'
 export type DragMode = 'draggable' | 'not draggable'
 
+/**
+ * Touching target check.
+ *
+ * Input: `target`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param target See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { touchingObject } from 'hikkaku/blocks'
+ *
+ * touchingObject('mouse-pointer')
+ * ```
+ */
 export const touchingObject = (target: string) => {
   return valueBlock('sensing_touchingobject', {
     inputs: {
@@ -27,6 +70,21 @@ export const touchingObject = (target: string) => {
   })
 }
 
+/**
+ * Touching color check.
+ *
+ * Input: `color`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param color See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { touchingColor } from 'hikkaku/blocks'
+ *
+ * touchingColor(undefined as any)
+ * ```
+ */
 export const touchingColor = (color: PrimitiveSource<string>) => {
   return valueBlock('sensing_touchingcolor', {
     inputs: {
@@ -35,6 +93,22 @@ export const touchingColor = (color: PrimitiveSource<string>) => {
   })
 }
 
+/**
+ * Color overlap check.
+ *
+ * Input: `color`, `targetColor`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param color See function signature for accepted input values.
+ * @param targetColor See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { colorTouchingColor } from 'hikkaku/blocks'
+ *
+ * colorTouchingColor(undefined as any, undefined as any)
+ * ```
+ */
 export const colorTouchingColor = (
   color: PrimitiveSource<string>,
   targetColor: PrimitiveSource<string>,
@@ -47,6 +121,21 @@ export const colorTouchingColor = (
   })
 }
 
+/**
+ * Distance to target.
+ *
+ * Input: `target`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param target See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { distanceTo } from 'hikkaku/blocks'
+ *
+ * distanceTo('mouse-pointer')
+ * ```
+ */
 export const distanceTo = (target: string) => {
   return valueBlock('sensing_distanceto', {
     fields: {
@@ -55,14 +144,57 @@ export const distanceTo = (target: string) => {
   })
 }
 
+/**
+ * Timer value.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getTimer } from 'hikkaku/blocks'
+ *
+ * getTimer()
+ * ```
+ */
 export const getTimer = () => {
   return valueBlock('sensing_timer', {})
 }
 
+/**
+ * Resets timer.
+ *
+ * Input: none.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { resetTimer } from 'hikkaku/blocks'
+ *
+ * resetTimer()
+ * ```
+ */
 export const resetTimer = () => {
   return block('sensing_resettimer', {})
 }
 
+/**
+ * Sets drag behavior.
+ *
+ * Input: `mode`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param mode See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setDragMode } from 'hikkaku/blocks'
+ *
+ * setDragMode('draggable')
+ * ```
+ */
 export const setDragMode = (mode: DragMode) => {
   return block('sensing_setdragmode', {
     fields: {
@@ -71,10 +203,39 @@ export const setDragMode = (mode: DragMode) => {
   })
 }
 
+/**
+ * Mouse button state.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getMouseDown } from 'hikkaku/blocks'
+ *
+ * getMouseDown()
+ * ```
+ */
 export const getMouseDown = () => {
   return valueBlock('sensing_mousedown', {})
 }
 
+/**
+ * Key state.
+ *
+ * Input: `key`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param key See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getKeyPressed } from 'hikkaku/blocks'
+ *
+ * getKeyPressed('space')
+ * ```
+ */
 export const getKeyPressed = (key: PrimitiveSource<string>) => {
   return valueBlock('sensing_keypressed', {
     inputs: {
@@ -83,6 +244,21 @@ export const getKeyPressed = (key: PrimitiveSource<string>) => {
   })
 }
 
+/**
+ * Current date/time value.
+ *
+ * Input: `menu`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param menu See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { current } from 'hikkaku/blocks'
+ *
+ * current('loudness')
+ * ```
+ */
 export const current = (menu: CurrentMenu) => {
   return valueBlock('sensing_current', {
     fields: {
@@ -91,6 +267,22 @@ export const current = (menu: CurrentMenu) => {
   })
 }
 
+/**
+ * Reads target attribute.
+ *
+ * Input: `property`, `target`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param property See function signature for accepted input values.
+ * @param target See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getAttributeOf } from 'hikkaku/blocks'
+ *
+ * getAttributeOf(undefined as any, 'mouse-pointer')
+ * ```
+ */
 export const getAttributeOf = (property: string, target: string) => {
   return valueBlock('sensing_of', {
     fields: {
@@ -100,18 +292,75 @@ export const getAttributeOf = (property: string, target: string) => {
   })
 }
 
+/**
+ * Days since 2000-01-01.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { daysSince2000 } from 'hikkaku/blocks'
+ *
+ * daysSince2000()
+ * ```
+ */
 export const daysSince2000 = () => {
   return valueBlock('sensing_dayssince2000', {})
 }
 
+/**
+ * Microphone loudness.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getLoudness } from 'hikkaku/blocks'
+ *
+ * getLoudness()
+ * ```
+ */
 export const getLoudness = () => {
   return valueBlock('sensing_loudness', {})
 }
 
+/**
+ * isLoud block helper.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { isLoud } from 'hikkaku/blocks'
+ *
+ * isLoud()
+ * ```
+ */
 export const isLoud = () => {
   return valueBlock('sensing_loud', {})
 }
 
+/**
+ * Asks user input.
+ *
+ * Input: `question`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param question See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { askAndWait } from 'hikkaku/blocks'
+ *
+ * askAndWait('Hello')
+ * ```
+ */
 export const askAndWait = (question: PrimitiveSource<string>) => {
   return block('sensing_askandwait', {
     inputs: {
@@ -120,10 +369,38 @@ export const askAndWait = (question: PrimitiveSource<string>) => {
   })
 }
 
+/**
+ * Returns last answer.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getAnswer } from 'hikkaku/blocks'
+ *
+ * getAnswer()
+ * ```
+ */
 export const getAnswer = () => {
   return valueBlock('sensing_answer', {})
 }
 
+/**
+ * Returns username.
+ *
+ * Input: none.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getUsername } from 'hikkaku/blocks'
+ *
+ * getUsername()
+ * ```
+ */
 export const getUsername = () => {
   return valueBlock('sensing_username', {})
 }
