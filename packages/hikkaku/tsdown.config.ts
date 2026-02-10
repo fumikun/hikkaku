@@ -7,6 +7,7 @@ export default defineConfig({
     'src/blocks/index.ts',
     'src/client/index.ts',
     'src/vite/index.ts',
+    'src/assets/index.ts',
   ],
   dts: true,
   async onSuccess() {
@@ -20,6 +21,9 @@ export default defineConfig({
               import: value
                 .replace(/\.ts$/, '.mjs')
                 .replace(/^\.\/src\//, './'),
+              types: value
+                .replace(/^\.\/src\//, './')
+                .replace(/\.ts$/, '.d.mts'),
             },
           ]
         }
