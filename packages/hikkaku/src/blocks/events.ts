@@ -1,4 +1,4 @@
-import type { Input } from '@pnsk-lab/sb3-types'
+import type { Input } from 'sb3-types'
 import { fromPrimitiveSource } from '../core/block-helper'
 import { block } from '../core/composer'
 import type { PrimitiveSource } from '../core/types'

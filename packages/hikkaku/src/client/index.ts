@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 // find root DOM node
 
-import type * as sb3 from '@pnsk-lab/sb3-types'
+import type * as sb3 from 'sb3-types'
 import { findDOMAppRoot, getScratchInternalStates } from './fiber'
 
 const root = findDOMAppRoot()

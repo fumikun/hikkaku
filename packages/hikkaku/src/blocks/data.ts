@@ -1,4 +1,4 @@
-import type { Fields } from '@pnsk-lab/sb3-types'
+import type { Fields } from 'sb3-types'
 import { fromPrimitiveSource } from '../core/block-helper'
 import { block, valueBlock } from '../core/composer'
 import type {
