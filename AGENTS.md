@@ -9,8 +9,8 @@
 ## Build, Test, and Development Commands
 - `bun install`: install workspace dependencies.
 - `bun run dev`: start the example app in `examples/example1` via Vite.
-- `bunx biome check .`: run lint + format checks across the repo.
-- `bunx biome format .`: apply formatting (use before committing).
+- `bun lint`: run lint + format checks across the repo.
+- `bun fmt`: apply formatting (use before committing).
 
 ## Coding Style & Naming Conventions
 - TypeScript/ESM (`type: module`); keep exports in `packages/hikkaku/src/index.ts` and related `src/*` entrypoints.
@@ -21,16 +21,14 @@
 - No automated test runner is configured in this repo yet.
 - If you add tests, place them near the code (e.g., `packages/hikkaku/src/**/__tests__/*.test.ts`) and document the command in `package.json`.
 
-## Commit & Pull Request Guidelines
-- Commit messages follow Conventional Commit-style prefixes (e.g., `feat:`, `fix:`, `rename:`, `feat(blocks):`). Keep them concise and action-oriented.
-- PRs should include a clear summary, link relevant issues/PRs, and add screenshots/GIFs for visible UI changes in `examples/example1`.
-
 ## Configuration & Security Notes
 - Keep dependency changes minimal and pinned to workspace scope.
 - Avoid adding secrets to the repo; use local `.env` files in examples if needed.
 
-## Commit
+## Commit & Pull Request Guidelines
 
+- Commit messages follow Conventional Commit-style prefixes (e.g., `feat:`, `fix:`, `rename:`, `feat(blocks):`). Keep them concise and action-oriented.
+- PRs should include a clear summary, link relevant issues/PRs, and add screenshots/GIFs for visible UI changes in `examples/example1`.
 * If you are Codex, use `Co-authored-by: chatgpt-codex-connector[bot] <199175422+chatgpt-codex-connector[bot]@users.noreply.github.com>` in the commit message to credit the human collaborator.
   * You have to add `--author="chatgpt-codex-connector[bot] <199175422+chatgpt-codex-connector[bot]@users.noreply.github.com>" --no-gpg-sign` option to git commit command.
   Example:
