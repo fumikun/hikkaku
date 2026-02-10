@@ -28,6 +28,5 @@ export default defineConfig({
     )
     await Bun.write('./dist/package.json', JSON.stringify(packageJSON, null, 2))
     await copyFile('./README.md', './dist/README.md')
-    await copyFile('./.npmrc', './dist/.npmrc')
   },
 })
