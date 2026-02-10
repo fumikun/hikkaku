@@ -81,7 +81,7 @@ export const stopAllSounds = () => {
  * ```ts
  * import { setSoundEffectTo } from 'hikkaku/blocks'
  *
- * setSoundEffectTo('color', 10)
+ * setSoundEffectTo('pitch', 10)
  * ```
  */
 export const setSoundEffectTo = (
