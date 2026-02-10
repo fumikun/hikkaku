@@ -4,6 +4,7 @@ import {
   addToList,
   and,
   argumentReporterStringNumber,
+  callProcedure,
   changeVariableBy,
   contains,
   defineProcedure,
@@ -34,29 +35,6 @@ import {
 const project = new Project()
 const parser = project.createSprite('json-parser')
 
-const originalToScratch = project.toScratch.bind(project)
-project.toScratch = () => {
-  const scratchProject = originalToScratch()
-
-  for (const target of scratchProject.targets) {
-    let topLevelRow = 0
-    for (const block of Object.values(target.blocks)) {
-      if (
-        typeof block === 'object' &&
-        block !== null &&
-        'opcode' in block &&
-        block.topLevel
-      ) {
-        block.x = 0
-        block.y = topLevelRow * 120
-        topLevelRow += 1
-      }
-    }
-  }
-
-  return scratchProject
-}
-
 const sourceText = parser.createVariable('sourceText', '')
 const parseOk = parser.createVariable('parseOk', 0)
 const errorCode = parser.createVariable('errorCode', '')
@@ -82,6 +60,8 @@ const rootNode = parser.createVariable('rootNode', 0)
 const found = parser.createVariable('found', 0)
 const i = parser.createVariable('i', 1)
 const j = parser.createVariable('j', 1)
+const k = parser.createVariable('k', 1)
+const rawQuery = parser.createVariable('rawQuery', '')
 const queryText = parser.createVariable('queryText', '')
 const queryPos = parser.createVariable('queryPos', 1)
 const queryLen = parser.createVariable('queryLen', 0)
@@ -107,12 +87,18 @@ const stackMode = parser.createList('stackMode', [])
 const stackKey = parser.createList('stackKey', [])
 const stackNextIndex = parser.createList('stackNextIndex', [])
 
+const queryNodes = parser.createList('queryNodes', [])
+const queryNextNodes = parser.createList('queryNextNodes', [])
+const queryTempNodes = parser.createList('queryTempNodes', [])
+
 const queryResult = project.stage.createList('queryResult', [])
 
 const read = (v: typeof idx) => getVariable(v)
 
 const parseProcCode = 'parse %s'
 const getProcCode = 'get %s'
+const parseArgumentIds: string[] = []
+const getArgumentIds: string[] = []
 
 let parseProcedure: ReturnType<typeof defineProcedure>
 let getProcedure: ReturnType<typeof defineProcedure>
@@ -121,6 +107,9 @@ parser.run(() => {
   parseProcedure = defineProcedure(
     [procedureLabel('parse'), procedureStringOrNumber('jsonText')],
     ({ jsonText }) => {
+      if (parseArgumentIds.length === 0) {
+        parseArgumentIds.push(jsonText.id)
+      }
       setVariableTo(sourceText, argumentReporterStringNumber(jsonText))
       setVariableTo(parseOk, 0)
       setVariableTo(errorCode, '')
@@ -1319,41 +1308,38 @@ parser.run(() => {
   getProcedure = defineProcedure(
     [procedureLabel('get'), procedureStringOrNumber('query')],
     ({ query }) => {
+      if (getArgumentIds.length === 0) {
+        getArgumentIds.push(query.id)
+      }
       deleteAllOfList(queryResult)
-      setVariableTo(queryText, argumentReporterStringNumber(query))
+      deleteAllOfList(queryNodes)
+      deleteAllOfList(queryNextNodes)
+      deleteAllOfList(queryTempNodes)
+
+      setVariableTo(rawQuery, argumentReporterStringNumber(query))
       setVariableTo(queryError, 0)
       setVariableTo(queryPos, 1)
-      setVariableTo(queryLen, length(read(queryText)))
-      setVariableTo(currentNode, read(rootNode))
+      setVariableTo(queryLen, length(read(rawQuery)))
 
       ifThen(equals(read(parseOk), 0), () => {
         setVariableTo(queryError, 1)
       })
 
       ifThen(
-        and(equals(read(queryError), 0), equals(read(queryLen), 0)),
-        () => {
-          setVariableTo(queryError, 1)
-        },
-      )
-
-      ifThen(
         and(
           equals(read(queryError), 0),
-          not(equals(letterOf(1, read(queryText)), '.')),
+          or(equals(read(queryLen), 0), equals(read(rootNode), 0)),
         ),
         () => {
           setVariableTo(queryError, 1)
         },
       )
 
-      ifThen(
-        and(equals(read(queryError), 0), equals(read(queryLen), 1)),
-        () => {
-          setVariableTo(queryPos, 2)
-        },
-      )
+      ifThen(equals(read(queryError), 0), () => {
+        addToList(queryNodes, read(rootNode))
+      })
 
+      // Split query by `|` and apply each stage from left to right.
       forEach(i, add(read(queryLen), 2), () => {
         ifThen(
           and(
@@ -1361,275 +1347,594 @@ parser.run(() => {
             lt(read(queryPos), add(read(queryLen), 1)),
           ),
           () => {
-            setVariableTo(ch, letterOf(read(queryPos), read(queryText)))
+            setVariableTo(queryText, '')
+            setVariableTo(tokenDone, 0)
 
-            ifElse(
-              equals(read(ch), '.'),
-              () => {
-                changeVariableBy(queryPos, 1)
-                setVariableTo(token, '')
-                setVariableTo(tokenDone, 0)
-
-                forEach(j, add(read(queryLen), 2), () => {
-                  ifThen(
-                    and(
-                      equals(read(tokenDone), 0),
-                      equals(read(queryError), 0),
-                    ),
+            forEach(j, add(read(queryLen), 2), () => {
+              ifThen(
+                and(
+                  equals(read(tokenDone), 0),
+                  lt(read(queryPos), add(read(queryLen), 1)),
+                ),
+                () => {
+                  setVariableTo(ch, letterOf(read(queryPos), read(rawQuery)))
+                  ifElse(
+                    equals(read(ch), '|'),
                     () => {
-                      ifElse(
-                        gt(read(queryPos), read(queryLen)),
-                        () => {
-                          setVariableTo(tokenDone, 1)
-                        },
-                        () => {
-                          setVariableTo(
-                            ch,
-                            letterOf(read(queryPos), read(queryText)),
-                          )
-                          ifElse(
-                            or(equals(read(ch), '.'), equals(read(ch), '[')),
-                            () => {
-                              setVariableTo(tokenDone, 1)
-                            },
-                            () => {
-                              setVariableTo(token, join(read(token), read(ch)))
-                              changeVariableBy(queryPos, 1)
-                            },
-                          )
-                        },
-                      )
+                      setVariableTo(tokenDone, 1)
+                    },
+                    () => {
+                      setVariableTo(queryText, join(read(queryText), read(ch)))
+                      changeVariableBy(queryPos, 1)
                     },
                   )
-                })
+                },
+              )
+            })
 
-                ifElse(
-                  equals(read(token), ''),
-                  () => {
-                    setVariableTo(queryError, 1)
-                  },
-                  () => {
-                    ifElse(
-                      not(
-                        equals(
-                          getItemOfList(nodeType, read(currentNode)),
-                          'object',
-                        ),
-                      ),
-                      () => {
-                        setVariableTo(queryError, 1)
-                      },
-                      () => {
-                        setVariableTo(found, 0)
-                        setVariableTo(nodeCount, lengthOfList(nodeType))
-                        forEach(j, read(nodeCount), () => {
-                          ifThen(equals(read(found), 0), () => {
-                            ifThen(
-                              and(
-                                equals(
-                                  getItemOfList(nodeParent, read(j)),
-                                  read(currentNode),
-                                ),
-                                equals(
-                                  getItemOfList(nodeKey, read(j)),
-                                  read(token),
-                                ),
-                              ),
-                              () => {
-                                setVariableTo(currentNode, read(j))
-                                setVariableTo(found, 1)
-                              },
-                            )
-                          })
-                        })
-                        ifThen(equals(read(found), 0), () => {
-                          setVariableTo(queryError, 1)
-                        })
-                      },
-                    )
-                  },
-                )
-              },
+            ifThen(
+              and(
+                lt(read(queryPos), add(read(queryLen), 1)),
+                equals(letterOf(read(queryPos), read(rawQuery)), '|'),
+              ),
               () => {
-                ifElse(
-                  equals(read(ch), '['),
+                changeVariableBy(queryPos, 1)
+              },
+            )
+
+            ifThen(equals(read(queryText), ''), () => {
+              setVariableTo(queryError, 1)
+            })
+
+            ifThen(equals(read(queryError), 0), () => {
+              setVariableTo(queryPos, 1)
+              setVariableTo(queryLen, length(read(queryText)))
+
+              forEach(j, add(read(queryLen), 2), () => {
+                ifThen(
+                  and(
+                    equals(read(queryError), 0),
+                    lt(read(queryPos), add(read(queryLen), 1)),
+                  ),
                   () => {
-                    changeVariableBy(queryPos, 1)
+                    setVariableTo(ch, letterOf(read(queryPos), read(queryText)))
+
                     ifElse(
-                      gt(read(queryPos), read(queryLen)),
+                      equals(read(ch), '.'),
                       () => {
-                        setVariableTo(queryError, 1)
-                      },
-                      () => {
-                        setVariableTo(
-                          ch,
-                          letterOf(read(queryPos), read(queryText)),
-                        )
                         ifElse(
-                          equals(read(ch), '"'),
+                          equals(
+                            letterOf(add(read(queryPos), 1), read(queryText)),
+                            '.',
+                          ),
                           () => {
-                            ifElse(
-                              not(
-                                equals(
-                                  getItemOfList(nodeType, read(currentNode)),
-                                  'object',
+                            // Recursive descent: `..` and `..key`
+                            changeVariableBy(queryPos, 2)
+                            setVariableTo(token, '')
+                            setVariableTo(tokenDone, 0)
+
+                            forEach(k, add(read(queryLen), 2), () => {
+                              ifThen(
+                                and(
+                                  equals(read(tokenDone), 0),
+                                  lt(read(queryPos), add(read(queryLen), 1)),
                                 ),
-                              ),
-                              () => {
-                                setVariableTo(queryError, 1)
-                              },
-                              () => {
-                                changeVariableBy(queryPos, 1)
-                                setVariableTo(token, '')
-                                setVariableTo(tokenDone, 0)
-                                forEach(j, add(read(queryLen), 2), () => {
-                                  ifThen(
-                                    and(
-                                      equals(read(tokenDone), 0),
-                                      equals(read(queryError), 0),
+                                () => {
+                                  setVariableTo(
+                                    ch,
+                                    letterOf(read(queryPos), read(queryText)),
+                                  )
+                                  ifElse(
+                                    or(
+                                      equals(read(ch), '.'),
+                                      equals(read(ch), '['),
                                     ),
                                     () => {
-                                      ifElse(
-                                        gt(read(queryPos), read(queryLen)),
+                                      setVariableTo(tokenDone, 1)
+                                    },
+                                    () => {
+                                      setVariableTo(
+                                        token,
+                                        join(read(token), read(ch)),
+                                      )
+                                      changeVariableBy(queryPos, 1)
+                                    },
+                                  )
+                                },
+                              )
+                            })
+
+                            deleteAllOfList(queryNextNodes)
+                            forEach(k, lengthOfList(queryNodes), () => {
+                              addToList(
+                                queryNextNodes,
+                                getItemOfList(queryNodes, read(k)),
+                              )
+                            })
+
+                            setVariableTo(nodeCount, lengthOfList(nodeType))
+                            // Closure over descendants.
+                            forEach(j, read(nodeCount), () => {
+                              forEach(k, read(nodeCount), () => {
+                                setVariableTo(
+                                  tempIndex,
+                                  getItemOfList(nodeParent, read(k)),
+                                )
+                                ifThen(gt(read(tempIndex), 0), () => {
+                                  setVariableTo(found, 0)
+                                  forEach(
+                                    j,
+                                    lengthOfList(queryNextNodes),
+                                    () => {
+                                      ifThen(
+                                        equals(
+                                          getItemOfList(
+                                            queryNextNodes,
+                                            read(j),
+                                          ),
+                                          read(tempIndex),
+                                        ),
                                         () => {
-                                          setVariableTo(queryError, 1)
-                                        },
-                                        () => {
-                                          setVariableTo(
-                                            ch,
-                                            letterOf(
-                                              read(queryPos),
-                                              read(queryText),
-                                            ),
-                                          )
-                                          ifElse(
-                                            equals(read(ch), '"'),
-                                            () => {
-                                              setVariableTo(tokenDone, 1)
-                                              changeVariableBy(queryPos, 1)
-                                            },
-                                            () => {
-                                              setVariableTo(
-                                                token,
-                                                join(read(token), read(ch)),
-                                              )
-                                              changeVariableBy(queryPos, 1)
-                                            },
-                                          )
+                                          setVariableTo(found, 1)
                                         },
                                       )
                                     },
                                   )
+
+                                  ifThen(equals(read(found), 1), () => {
+                                    setVariableTo(tokenDone, 0)
+                                    forEach(
+                                      j,
+                                      lengthOfList(queryNextNodes),
+                                      () => {
+                                        ifThen(
+                                          equals(
+                                            getItemOfList(
+                                              queryNextNodes,
+                                              read(j),
+                                            ),
+                                            read(k),
+                                          ),
+                                          () => {
+                                            setVariableTo(tokenDone, 1)
+                                          },
+                                        )
+                                      },
+                                    )
+                                    ifThen(equals(read(tokenDone), 0), () => {
+                                      addToList(queryNextNodes, read(k))
+                                    })
+                                  })
                                 })
-                                ifThen(
-                                  and(
-                                    equals(read(queryError), 0),
-                                    not(
+                              })
+                            })
+
+                            ifElse(
+                              equals(read(token), ''),
+                              () => {
+                                deleteAllOfList(queryNodes)
+                                forEach(k, lengthOfList(queryNextNodes), () => {
+                                  addToList(
+                                    queryNodes,
+                                    getItemOfList(queryNextNodes, read(k)),
+                                  )
+                                })
+                              },
+                              () => {
+                                deleteAllOfList(queryNodes)
+                                forEach(k, lengthOfList(queryNextNodes), () => {
+                                  setVariableTo(
+                                    currentNode,
+                                    getItemOfList(queryNextNodes, read(k)),
+                                  )
+                                  ifThen(
+                                    equals(
+                                      getItemOfList(nodeKey, read(currentNode)),
+                                      read(token),
+                                    ),
+                                    () => {
+                                      addToList(queryNodes, read(currentNode))
+                                    },
+                                  )
+                                })
+                              },
+                            )
+                          },
+                          () => {
+                            changeVariableBy(queryPos, 1)
+                            setVariableTo(token, '')
+                            setVariableTo(tokenDone, 0)
+
+                            forEach(k, add(read(queryLen), 2), () => {
+                              ifThen(
+                                and(
+                                  equals(read(tokenDone), 0),
+                                  lt(read(queryPos), add(read(queryLen), 1)),
+                                ),
+                                () => {
+                                  setVariableTo(
+                                    ch,
+                                    letterOf(read(queryPos), read(queryText)),
+                                  )
+                                  ifElse(
+                                    or(
+                                      equals(read(ch), '.'),
+                                      equals(read(ch), '['),
+                                    ),
+                                    () => {
+                                      setVariableTo(tokenDone, 1)
+                                    },
+                                    () => {
+                                      setVariableTo(
+                                        token,
+                                        join(read(token), read(ch)),
+                                      )
+                                      changeVariableBy(queryPos, 1)
+                                    },
+                                  )
+                                },
+                              )
+                            })
+
+                            ifThen(not(equals(read(token), '')), () => {
+                              deleteAllOfList(queryNextNodes)
+                              setVariableTo(nodeCount, lengthOfList(nodeType))
+                              forEach(k, lengthOfList(queryNodes), () => {
+                                setVariableTo(
+                                  currentNode,
+                                  getItemOfList(queryNodes, read(k)),
+                                )
+                                forEach(j, read(nodeCount), () => {
+                                  ifThen(
+                                    and(
                                       equals(
-                                        letterOf(
-                                          read(queryPos),
-                                          read(queryText),
-                                        ),
-                                        ']',
+                                        getItemOfList(nodeParent, read(j)),
+                                        read(currentNode),
+                                      ),
+                                      equals(
+                                        getItemOfList(nodeKey, read(j)),
+                                        read(token),
                                       ),
                                     ),
-                                  ),
-                                  () => {
-                                    setVariableTo(queryError, 1)
-                                  },
+                                    () => {
+                                      addToList(queryNextNodes, read(j))
+                                    },
+                                  )
+                                })
+                              })
+
+                              deleteAllOfList(queryNodes)
+                              forEach(k, lengthOfList(queryNextNodes), () => {
+                                addToList(
+                                  queryNodes,
+                                  getItemOfList(queryNextNodes, read(k)),
                                 )
-                                ifThen(equals(read(queryError), 0), () => {
+                              })
+                            })
+                          },
+                        )
+                      },
+                      () => {
+                        ifElse(
+                          equals(read(ch), '['),
+                          () => {
+                            changeVariableBy(queryPos, 1)
+                            ifThen(gt(read(queryPos), read(queryLen)), () => {
+                              setVariableTo(queryError, 1)
+                            })
+
+                            ifThen(equals(read(queryError), 0), () => {
+                              setVariableTo(
+                                ch,
+                                letterOf(read(queryPos), read(queryText)),
+                              )
+
+                              ifElse(
+                                equals(read(ch), ']'),
+                                () => {
+                                  // Wildcard children: `[]`
                                   changeVariableBy(queryPos, 1)
-                                  setVariableTo(found, 0)
+                                  deleteAllOfList(queryNextNodes)
                                   setVariableTo(
                                     nodeCount,
                                     lengthOfList(nodeType),
                                   )
-                                  forEach(j, read(nodeCount), () => {
-                                    ifThen(equals(read(found), 0), () => {
+                                  forEach(k, lengthOfList(queryNodes), () => {
+                                    setVariableTo(
+                                      currentNode,
+                                      getItemOfList(queryNodes, read(k)),
+                                    )
+                                    forEach(j, read(nodeCount), () => {
                                       ifThen(
-                                        and(
-                                          equals(
-                                            getItemOfList(nodeParent, read(j)),
-                                            read(currentNode),
-                                          ),
-                                          equals(
-                                            getItemOfList(nodeKey, read(j)),
-                                            read(token),
-                                          ),
+                                        equals(
+                                          getItemOfList(nodeParent, read(j)),
+                                          read(currentNode),
                                         ),
                                         () => {
-                                          setVariableTo(currentNode, read(j))
-                                          setVariableTo(found, 1)
+                                          addToList(queryNextNodes, read(j))
                                         },
                                       )
                                     })
                                   })
-                                  ifThen(equals(read(found), 0), () => {
-                                    setVariableTo(queryError, 1)
-                                  })
-                                })
-                              },
-                            )
-                          },
-                          () => {
-                            ifElse(
-                              not(
-                                equals(
-                                  getItemOfList(nodeType, read(currentNode)),
-                                  'array',
-                                ),
-                              ),
-                              () => {
-                                setVariableTo(queryError, 1)
-                              },
-                              () => {
-                                setVariableTo(numberBuffer, '')
-                                setVariableTo(tokenDone, 0)
-                                forEach(j, add(read(queryLen), 2), () => {
-                                  ifThen(
-                                    and(
-                                      equals(read(tokenDone), 0),
-                                      equals(read(queryError), 0),
-                                    ),
+
+                                  deleteAllOfList(queryNodes)
+                                  forEach(
+                                    k,
+                                    lengthOfList(queryNextNodes),
                                     () => {
-                                      ifElse(
-                                        gt(read(queryPos), read(queryLen)),
-                                        () => {
-                                          setVariableTo(queryError, 1)
-                                        },
-                                        () => {
-                                          setVariableTo(
-                                            ch,
+                                      addToList(
+                                        queryNodes,
+                                        getItemOfList(queryNextNodes, read(k)),
+                                      )
+                                    },
+                                  )
+                                },
+                                () => {
+                                  ifElse(
+                                    equals(read(ch), '"'),
+                                    () => {
+                                      changeVariableBy(queryPos, 1)
+                                      setVariableTo(token, '')
+                                      setVariableTo(tokenDone, 0)
+
+                                      forEach(k, add(read(queryLen), 2), () => {
+                                        ifThen(
+                                          and(
+                                            equals(read(tokenDone), 0),
+                                            lt(
+                                              read(queryPos),
+                                              add(read(queryLen), 1),
+                                            ),
+                                          ),
+                                          () => {
+                                            setVariableTo(
+                                              ch,
+                                              letterOf(
+                                                read(queryPos),
+                                                read(queryText),
+                                              ),
+                                            )
+                                            ifElse(
+                                              equals(read(ch), '"'),
+                                              () => {
+                                                setVariableTo(tokenDone, 1)
+                                                changeVariableBy(queryPos, 1)
+                                              },
+                                              () => {
+                                                setVariableTo(
+                                                  token,
+                                                  join(read(token), read(ch)),
+                                                )
+                                                changeVariableBy(queryPos, 1)
+                                              },
+                                            )
+                                          },
+                                        )
+                                      })
+
+                                      ifThen(
+                                        not(
+                                          equals(
                                             letterOf(
                                               read(queryPos),
                                               read(queryText),
                                             ),
+                                            ']',
+                                          ),
+                                        ),
+                                        () => {
+                                          setVariableTo(queryError, 1)
+                                        },
+                                      )
+                                      ifThen(
+                                        equals(read(queryError), 0),
+                                        () => {
+                                          changeVariableBy(queryPos, 1)
+                                          deleteAllOfList(queryNextNodes)
+                                          setVariableTo(
+                                            nodeCount,
+                                            lengthOfList(nodeType),
                                           )
-                                          ifElse(
-                                            equals(read(ch), ']'),
+                                          forEach(
+                                            k,
+                                            lengthOfList(queryNodes),
                                             () => {
-                                              setVariableTo(tokenDone, 1)
-                                            },
-                                            () => {
-                                              ifElse(
-                                                contains(
-                                                  '0123456789',
-                                                  read(ch),
+                                              setVariableTo(
+                                                currentNode,
+                                                getItemOfList(
+                                                  queryNodes,
+                                                  read(k),
                                                 ),
+                                              )
+                                              forEach(
+                                                i,
+                                                read(nodeCount),
                                                 () => {
-                                                  setVariableTo(
-                                                    numberBuffer,
-                                                    join(
-                                                      read(numberBuffer),
-                                                      read(ch),
+                                                  ifThen(
+                                                    and(
+                                                      equals(
+                                                        getItemOfList(
+                                                          nodeParent,
+                                                          read(i),
+                                                        ),
+                                                        read(currentNode),
+                                                      ),
+                                                      equals(
+                                                        getItemOfList(
+                                                          nodeKey,
+                                                          read(i),
+                                                        ),
+                                                        read(token),
+                                                      ),
                                                     ),
+                                                    () => {
+                                                      addToList(
+                                                        queryNextNodes,
+                                                        read(i),
+                                                      )
+                                                    },
                                                   )
-                                                  changeVariableBy(queryPos, 1)
                                                 },
+                                              )
+                                            },
+                                          )
+
+                                          deleteAllOfList(queryNodes)
+                                          forEach(
+                                            k,
+                                            lengthOfList(queryNextNodes),
+                                            () => {
+                                              addToList(
+                                                queryNodes,
+                                                getItemOfList(
+                                                  queryNextNodes,
+                                                  read(k),
+                                                ),
+                                              )
+                                            },
+                                          )
+                                        },
+                                      )
+                                    },
+                                    () => {
+                                      setVariableTo(numberBuffer, '')
+                                      setVariableTo(tokenDone, 0)
+
+                                      forEach(k, add(read(queryLen), 2), () => {
+                                        ifThen(
+                                          and(
+                                            equals(read(tokenDone), 0),
+                                            lt(
+                                              read(queryPos),
+                                              add(read(queryLen), 1),
+                                            ),
+                                          ),
+                                          () => {
+                                            setVariableTo(
+                                              ch,
+                                              letterOf(
+                                                read(queryPos),
+                                                read(queryText),
+                                              ),
+                                            )
+                                            ifElse(
+                                              equals(read(ch), ']'),
+                                              () => {
+                                                setVariableTo(tokenDone, 1)
+                                              },
+                                              () => {
+                                                ifElse(
+                                                  contains(
+                                                    '0123456789',
+                                                    read(ch),
+                                                  ),
+                                                  () => {
+                                                    setVariableTo(
+                                                      numberBuffer,
+                                                      join(
+                                                        read(numberBuffer),
+                                                        read(ch),
+                                                      ),
+                                                    )
+                                                    changeVariableBy(
+                                                      queryPos,
+                                                      1,
+                                                    )
+                                                  },
+                                                  () => {
+                                                    setVariableTo(queryError, 1)
+                                                  },
+                                                )
+                                              },
+                                            )
+                                          },
+                                        )
+                                      })
+
+                                      ifThen(
+                                        or(
+                                          equals(read(numberBuffer), ''),
+                                          not(
+                                            equals(
+                                              letterOf(
+                                                read(queryPos),
+                                                read(queryText),
+                                              ),
+                                              ']',
+                                            ),
+                                          ),
+                                        ),
+                                        () => {
+                                          setVariableTo(queryError, 1)
+                                        },
+                                      )
+                                      ifThen(
+                                        equals(read(queryError), 0),
+                                        () => {
+                                          changeVariableBy(queryPos, 1)
+                                          deleteAllOfList(queryNextNodes)
+                                          setVariableTo(
+                                            nodeCount,
+                                            lengthOfList(nodeType),
+                                          )
+                                          forEach(
+                                            k,
+                                            lengthOfList(queryNodes),
+                                            () => {
+                                              setVariableTo(
+                                                currentNode,
+                                                getItemOfList(
+                                                  queryNodes,
+                                                  read(k),
+                                                ),
+                                              )
+                                              forEach(
+                                                i,
+                                                read(nodeCount),
                                                 () => {
-                                                  setVariableTo(queryError, 1)
+                                                  ifThen(
+                                                    and(
+                                                      equals(
+                                                        getItemOfList(
+                                                          nodeParent,
+                                                          read(i),
+                                                        ),
+                                                        read(currentNode),
+                                                      ),
+                                                      equals(
+                                                        getItemOfList(
+                                                          nodeIndex,
+                                                          read(i),
+                                                        ),
+                                                        add(
+                                                          read(numberBuffer),
+                                                          1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    () => {
+                                                      addToList(
+                                                        queryNextNodes,
+                                                        read(i),
+                                                      )
+                                                    },
+                                                  )
                                                 },
+                                              )
+                                            },
+                                          )
+
+                                          deleteAllOfList(queryNodes)
+                                          forEach(
+                                            k,
+                                            lengthOfList(queryNextNodes),
+                                            () => {
+                                              addToList(
+                                                queryNodes,
+                                                getItemOfList(
+                                                  queryNextNodes,
+                                                  read(k),
+                                                ),
                                               )
                                             },
                                           )
@@ -1637,95 +1942,70 @@ parser.run(() => {
                                       )
                                     },
                                   )
-                                })
-                                ifThen(equals(read(numberBuffer), ''), () => {
-                                  setVariableTo(queryError, 1)
-                                })
-                                ifThen(
-                                  and(
-                                    equals(read(queryError), 0),
-                                    equals(
-                                      letterOf(read(queryPos), read(queryText)),
-                                      ']',
-                                    ),
-                                  ),
-                                  () => {
-                                    changeVariableBy(queryPos, 1)
-                                    setVariableTo(found, 0)
-                                    setVariableTo(
-                                      nodeCount,
-                                      lengthOfList(nodeType),
-                                    )
-                                    forEach(j, read(nodeCount), () => {
-                                      ifThen(equals(read(found), 0), () => {
-                                        ifThen(
-                                          and(
-                                            equals(
-                                              getItemOfList(
-                                                nodeParent,
-                                                read(j),
-                                              ),
-                                              read(currentNode),
-                                            ),
-                                            equals(
-                                              getItemOfList(nodeIndex, read(j)),
-                                              read(numberBuffer),
-                                            ),
-                                          ),
-                                          () => {
-                                            setVariableTo(currentNode, read(j))
-                                            setVariableTo(found, 1)
-                                          },
-                                        )
-                                      })
-                                    })
-                                    ifThen(equals(read(found), 0), () => {
-                                      setVariableTo(queryError, 1)
-                                    })
-                                  },
-                                )
-                              },
-                            )
+                                },
+                              )
+                            })
+                          },
+                          () => {
+                            setVariableTo(queryError, 1)
                           },
                         )
                       },
                     )
-                  },
-                  () => {
-                    setVariableTo(queryError, 1)
+
+                    ifThen(
+                      and(
+                        equals(read(queryError), 0),
+                        equals(lengthOfList(queryNodes), 0),
+                      ),
+                      () => {
+                        setVariableTo(queryError, 1)
+                      },
+                    )
                   },
                 )
-              },
-            )
+              })
+            })
+
+            // Restore raw-query length for the outer pipe loop.
+            setVariableTo(queryLen, length(read(rawQuery)))
           },
         )
       })
 
-      ifThen(equals(read(queryError), 0), () => {
-        setVariableTo(startPos, getItemOfList(nodeStart, read(currentNode)))
-        setVariableTo(endPos, getItemOfList(nodeEnd, read(currentNode)))
-        setVariableTo(resultBuffer, '')
-        setVariableTo(tempIndex, read(startPos))
-        forEach(i, add(read(len), 2), () => {
-          ifThen(
-            and(
-              equals(read(queryError), 0),
-              not(gt(read(tempIndex), read(endPos))),
-            ),
-            () => {
-              setVariableTo(
-                resultBuffer,
-                join(
-                  read(resultBuffer),
-                  letterOf(read(tempIndex), read(sourceText)),
-                ),
-              )
-              changeVariableBy(tempIndex, 1)
-            },
-          )
-        })
-        addToList(queryResult, read(resultBuffer))
-      })
+      ifThen(
+        and(equals(read(queryError), 0), gt(lengthOfList(queryNodes), 0)),
+        () => {
+          forEach(i, lengthOfList(queryNodes), () => {
+            setVariableTo(currentNode, getItemOfList(queryNodes, read(i)))
+            setVariableTo(startPos, getItemOfList(nodeStart, read(currentNode)))
+            setVariableTo(endPos, getItemOfList(nodeEnd, read(currentNode)))
+            setVariableTo(resultBuffer, '')
+            setVariableTo(tempIndex, read(startPos))
+            forEach(j, add(read(len), 2), () => {
+              ifThen(not(gt(read(tempIndex), read(endPos))), () => {
+                setVariableTo(
+                  resultBuffer,
+                  join(
+                    read(resultBuffer),
+                    letterOf(read(tempIndex), read(sourceText)),
+                  ),
+                )
+                changeVariableBy(tempIndex, 1)
+              })
+            })
+            addToList(queryResult, read(resultBuffer))
+          })
+        },
+      )
+
+      ifThen(
+        or(equals(read(queryError), 1), equals(lengthOfList(queryResult), 0)),
+        () => {
+          deleteAllOfList(queryResult)
+          setVariableTo(queryError, 1)
+        },
+      )
 
       ifThen(equals(read(queryError), 1), () => {
         ifElse(
@@ -1747,25 +2027,39 @@ parser.run(() => {
 
   whenFlagClicked(() => {
     showList(queryResult)
-
     // Sample JSON data to parse
     const sampleJSON = '{"name":"Alice","age":30,"items":[1,2,3]}'
-
     // Parse the JSON
-    const parseArgId = parseProcedure.argumentIds[0] as string
-    parseProcedure.call({ [parseArgId]: sampleJSON })
-
+    const parseArgId = parseArgumentIds[0] ?? ''
+    callProcedure(parseProcCode, parseArgumentIds, {
+      [parseArgId]: sampleJSON,
+    })
     // Query the data (examples)
-    const getArgId = getProcedure.argumentIds[0] as string
-
+    const getArgId = getArgumentIds[0] ?? ''
     // Get name: .name
-    getProcedure.call({ [getArgId]: '.name' })
-
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '.name',
+    })
     // Get age: .age
-    getProcedure.call({ [getArgId]: '.age' })
-
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '.age',
+    })
     // Get first item from array: .items[0]
-    getProcedure.call({ [getArgId]: '.items[0]' })
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '.items[0]',
+    })
+    // Pipe: .items | [0]
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '.items|[0]',
+    })
+    // Wildcard: .items[]
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '.items[]',
+    })
+    // Recursive descent: ..age
+    callProcedure(getProcCode, getArgumentIds, {
+      [getArgId]: '..age',
+    })
   })
 })
 
