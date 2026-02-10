@@ -10,6 +10,44 @@ import type {
 let nextAssetId = 0
 const createAssetId = () => `asset-${(++nextAssetId).toString(16)}`
 
+const coreOpcodePrefixes = new Set([
+  'argument',
+  'control',
+  'data',
+  'event',
+  'looks',
+  'motion',
+  'operator',
+  'procedures',
+  'sensing',
+  'sound',
+])
+
+const isBlockObject = (
+  block: sb3.Block | sb3.TopLevelPrimitive,
+): block is sb3.Block => {
+  return typeof block === 'object' && block !== null && 'opcode' in block
+}
+
+const collectExtensions = (targets: Array<sb3.Stage | sb3.Sprite>) => {
+  const extensions = new Set<string>()
+
+  for (const target of targets) {
+    for (const block of Object.values(target.blocks)) {
+      if (!isBlockObject(block)) {
+        continue
+      }
+
+      const [prefix] = block.opcode.split('_')
+      if (prefix && !coreOpcodePrefixes.has(prefix)) {
+        extensions.add(prefix)
+      }
+    }
+  }
+
+  return Array.from(extensions).sort()
+}
+
 export class Target<IsStage extends boolean = boolean> {
   readonly isStage: IsStage
   readonly name: IsStage extends true ? 'Stage' : string
@@ -127,12 +165,20 @@ export class Project {
     return sprite
   }
   toScratch(): sb3.ScratchProject {
-    return {
-      targets: this.#targets.map((target) => target.toScratch()),
+    const targets = this.#targets.map((target) => target.toScratch())
+    const extensions = collectExtensions(targets)
+    const project: sb3.ScratchProject & { extensions?: string[] } = {
+      targets,
       meta: {
         semver: '3.0.0',
         agent: `Hikkaku | ${globalThis.navigator ? navigator.userAgent : 'unknown'}`,
       },
     }
+
+    if (extensions.length > 0) {
+      project.extensions = extensions
+    }
+
+    return project
   }
 }
