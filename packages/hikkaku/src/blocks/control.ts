@@ -1,5 +1,5 @@
 import { fromPrimitiveSource } from '../core/block-helper'
-import { block, substack, valueBlock } from '../core/composer'
+import { attachStack, block, substack, valueBlock } from '../core/composer'
 import type { PrimitiveSource, VariableReference } from '../core/types'
 
 export type StopOption =
@@ -193,7 +193,7 @@ export const controlStartAsClone = (stack?: () => void) => {
   const res = block('control_start_as_clone', {
     topLevel: true,
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 

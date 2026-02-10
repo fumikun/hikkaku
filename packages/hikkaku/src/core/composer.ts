@@ -111,8 +111,52 @@ const catchNewBlocks = (
   ctx.adder = (id: string, block: sb3.Block) => {
     catched(id, block)
   }
-  handler()
-  ctx.adder = oldAdder
+  try {
+    handler()
+  } finally {
+    ctx.adder = oldAdder
+  }
+}
+
+const firstExecutableBlockId = (blocks: sb3.Block[]) => {
+  const ctx = getRootContext()
+  for (const block of blocks) {
+    if (!block || ctx.usedAsValueSet.has(block)) {
+      continue
+    }
+    const blockId = ctx.blockToId.get(block)
+    if (blockId) {
+      return blockId
+    }
+  }
+  return null
+}
+
+const layoutTopLevelBlocks = (blocks: sb3.Block[]) => {
+  const ctx = getRootContext()
+  const seen = new Set<string>()
+  let index = 0
+
+  for (const block of blocks) {
+    if (!block || !block.topLevel) {
+      continue
+    }
+
+    const blockId = ctx.blockToId.get(block)
+    if (!blockId || seen.has(blockId)) {
+      continue
+    }
+    seen.add(blockId)
+
+    // Keep explicit coordinates if a caller sets them in the future.
+    if (block.x !== 0 || block.y !== 0) {
+      continue
+    }
+
+    block.x = 64
+    block.y = 72 + index * 260
+    index++
+  }
 }
 
 export const substack = (handler: Handler) => {
@@ -125,18 +169,37 @@ export const substack = (handler: Handler) => {
   })
   applyNextAndParent(blocks)
 
-  // Pick the first executable block (skip value blocks used as inputs).
-  for (const block of blocks) {
-    if (!block || ctx.usedAsValueSet.has(block)) {
-      continue
-    }
-    const blockId = ctx.blockToId.get(block)
-    if (blockId) {
-      return blockId
-    }
+  return firstExecutableBlockId(blocks)
+}
+
+export const attachStack = (parentId: string, handler?: Handler) => {
+  if (!handler) {
+    return null
   }
 
-  return null
+  const ctx = getRootContext()
+  const blocks: sb3.Block[] = []
+  catchNewBlocks(handler, (id, block) => {
+    ctx.blocks[id] = block
+    blocks.push(block)
+  })
+
+  const stackBlocks = blocks.filter((block) => !block.topLevel)
+  applyNextAndParent(stackBlocks)
+
+  const firstBlockId = firstExecutableBlockId(stackBlocks)
+  if (!firstBlockId) {
+    return null
+  }
+
+  const parentBlock = ctx.blocks[parentId]
+  const firstBlock = ctx.blocks[firstBlockId]
+  if (parentBlock && firstBlock) {
+    parentBlock.next = firstBlockId
+    firstBlock.parent = parentId
+  }
+
+  return firstBlockId
 }
 
 export const createBlocks = (handler: Handler) => {
@@ -154,6 +217,7 @@ export const createBlocks = (handler: Handler) => {
     blocksForAddingNext.push(block)
   })
   applyNextAndParent(blocksForAddingNext)
+  layoutTopLevelBlocks(blocksForAddingNext)
 
   const unconnectedValueBlocks: Array<{ id: string; opcode: string }> = []
   for (const [blockId, block] of Object.entries(blocks)) {

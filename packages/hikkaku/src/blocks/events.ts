@@ -1,13 +1,13 @@
 import type { Input } from 'sb3-types'
 import { fromPrimitiveSource } from '../core/block-helper'
-import { block } from '../core/composer'
+import { attachStack, block } from '../core/composer'
 import type { PrimitiveSource } from '../core/types'
 
 export const whenFlagClicked = (stack?: () => void) => {
   const res = block('event_whenflagclicked', {
     topLevel: true,
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -18,7 +18,7 @@ export const whenKeyPressed = (key: string, stack?: () => void) => {
       KEY_OPTION: [key, null],
     },
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -26,7 +26,7 @@ export const whenThisSpriteClicked = (stack?: () => void) => {
   const res = block('event_whenthisspriteclicked', {
     topLevel: true,
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -34,7 +34,7 @@ export const whenStageClicked = (stack?: () => void) => {
   const res = block('event_whenstageclicked', {
     topLevel: true,
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -48,7 +48,7 @@ export const whenBackdropSwitchesTo = (
       BACKDROP: [backdrop, null],
     },
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -62,7 +62,7 @@ export const whenBroadcastReceived = (
       BROADCAST_OPTION: [broadcast, null],
     },
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -73,7 +73,7 @@ export const whenTouchingObject = (target: string, stack?: () => void) => {
       TOUCHINGOBJECTMENU: [target, null],
     },
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 
@@ -91,7 +91,7 @@ export const whenGreaterThan = (
       WHENGREATERTHANMENU: [menu, null],
     },
   })
-  stack?.()
+  attachStack(res.id, stack)
   return res
 }
 

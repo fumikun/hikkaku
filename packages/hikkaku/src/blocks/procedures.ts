@@ -1,5 +1,5 @@
 import { fromPrimitiveSource } from '../core/block-helper'
-import { block, valueBlock } from '../core/composer'
+import { attachStack, block, valueBlock } from '../core/composer'
 import type { PrimitiveSource } from '../core/types'
 
 export type ProcedureArgumentDefault = string | boolean
@@ -157,7 +157,13 @@ export const defineProcedure = <T extends ProcedureProc[]>(
       ]
     }),
   )
-  stack?.(references as ReferencesByProcs<T>)
+
+  if (stack) {
+    attachStack(definition.id, () => {
+      stack(references as ReferencesByProcs<T>)
+    })
+  }
+
   return definition
 }
 
