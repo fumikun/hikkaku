@@ -1,6 +1,6 @@
 import { fromPrimitiveSource } from '../core/block-helper'
 import { attachStack, block, valueBlock } from '../core/composer'
-import type { PrimitiveSource } from '../core/types'
+import type { HikkakuBlock, PrimitiveSource } from '../core/types'
 
 export type ProcedureArgumentDefault = string | boolean
 
@@ -111,6 +111,27 @@ export type ProcedureReference =
   | ProcedureBooleanReference
   | ProcedureStringOrNumberReference
 
+export interface ProcedureDefinitionReference<
+  T extends ProcedureProc[] = ProcedureProc[],
+> {
+  type: 'procedure'
+  proccode: string
+  warp: boolean
+  argumentids: string[]
+  arguments: ReferencesByProcs<T>
+}
+
+export type ProcedureCallInput = {
+  reference: ProcedureReference
+  value: PrimitiveSource<string | number | boolean>
+}
+
+export interface ProcedureDefinition<
+  T extends ProcedureProc[] = ProcedureProc[],
+> extends HikkakuBlock {
+  reference: ProcedureDefinitionReference<T>
+}
+
 type ReferencesByProcs<T extends ProcedureProc[]> = {
   [K in OnlyArgProc<T[number]>['name']]: OnlyArgProc<T[number]> extends {
     type: infer U
@@ -148,7 +169,7 @@ export const defineProcedure = <T extends ProcedureProc[]>(
    * This can make the procedure run faster, but the screen will not update until the procedure is done.
    */
   warp = false,
-) => {
+): ProcedureDefinition<T> => {
   const proccode = proclist
     .map((proc) => {
       switch (proc.type) {
@@ -218,26 +239,37 @@ export const defineProcedure = <T extends ProcedureProc[]>(
         } as ProcedureReference,
       ]
     }),
-  )
+  ) as ReferencesByProcs<T>
+
+  const reference: ProcedureDefinitionReference<T> = {
+    type: 'procedure',
+    proccode,
+    argumentids,
+    warp,
+    arguments: references,
+  }
 
   if (stack) {
     attachStack(definition.id, () => {
-      stack(references as ReferencesByProcs<T>)
+      stack(references)
     })
   }
 
-  return definition
+  return {
+    ...definition,
+    reference,
+  }
 }
 
 /**
  * Calls a custom procedure.
  *
- * Input: `proccode`, `argumentIds`, `inputs`, `warp`.
+ * Input: either (`proccode`, `argumentIds`, `inputs`, `warp`) or (`definitionOrReference`, `inputsByReference`, `warp`).
  * Output: Scratch statement block definition that is appended to the current script stack.
  *
- * @param proccode See function signature for accepted input values.
- * @param argumentIds See function signature for accepted input values.
- * @param inputs See function signature for accepted input values.
+ * @param proccodeOrReference See function signature for accepted input values.
+ * @param argumentIdsOrInputs See function signature for accepted input values.
+ * @param inputsOrWarp See function signature for accepted input values.
  * @param warp See function signature for accepted input values.
  * @returns Scratch statement block definition that is appended to the current script stack.
  * @example
@@ -248,11 +280,57 @@ export const defineProcedure = <T extends ProcedureProc[]>(
  * ```
  */
 export const callProcedure = (
-  proccode: string,
-  argumentIds: string[],
-  inputs: Record<string, PrimitiveSource<string | number | boolean>>,
+  proccodeOrReference:
+    | string
+    | ProcedureDefinitionReference
+    | ProcedureDefinition,
+  argumentIdsOrInputs:
+    | string[]
+    | ProcedureCallInput[]
+    | Record<string, PrimitiveSource<string | number | boolean>>,
+  inputsOrWarp?:
+    | Record<string, PrimitiveSource<string | number | boolean>>
+    | boolean,
   warp = false,
 ) => {
+  let proccode = ''
+  let argumentIds: string[] = []
+  let inputs: Record<string, PrimitiveSource<string | number | boolean>> = {}
+
+  if (typeof proccodeOrReference === 'string') {
+    proccode = proccodeOrReference
+    argumentIds = argumentIdsOrInputs as string[]
+    inputs = (typeof inputsOrWarp === 'object' ? inputsOrWarp : undefined) ?? {}
+    warp = typeof inputsOrWarp === 'boolean' ? inputsOrWarp : warp
+  } else {
+    const procedureReference =
+      'reference' in proccodeOrReference
+        ? proccodeOrReference.reference
+        : proccodeOrReference
+
+    proccode = procedureReference.proccode
+    argumentIds = procedureReference.argumentids
+    warp =
+      typeof inputsOrWarp === 'boolean' ? inputsOrWarp : procedureReference.warp
+
+    if (
+      Array.isArray(argumentIdsOrInputs) &&
+      argumentIdsOrInputs.every(
+        (input): input is ProcedureCallInput =>
+          typeof input === 'object' &&
+          input !== null &&
+          'reference' in input &&
+          'value' in input,
+      )
+    ) {
+      for (const input of argumentIdsOrInputs) {
+        inputs[input.reference.id] = input.value
+      }
+    } else if (!Array.isArray(argumentIdsOrInputs)) {
+      inputs = argumentIdsOrInputs
+    }
+  }
+
   const resolvedInputs: Record<
     string,
     ReturnType<typeof fromPrimitiveSource>
