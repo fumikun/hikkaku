@@ -29,7 +29,4 @@ import.meta.hot?.on('hikkaku:project', async (project: sb3.ScratchProject) => {
   console.log('Project loaded.')
 
   //state.scratchBlocks.getMainWorkspace().cleanUp()
-
 })
-
-
