@@ -21,6 +21,21 @@ export type ProcedureProc =
   | ProcedureProcBoolean
   | ProcedureProcStringOrNumber
 
+/**
+ * Label fragment for custom block.
+ *
+ * Input: `text`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param text See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { procedureLabel } from 'hikkaku/blocks'
+ *
+ * procedureLabel('Hello')
+ * ```
+ */
 export const procedureLabel = (text: string): ProcedureProcLabel => {
   return {
     type: 'label',
@@ -28,6 +43,21 @@ export const procedureLabel = (text: string): ProcedureProcLabel => {
   }
 }
 
+/**
+ * Boolean argument fragment.
+ *
+ * Input: `name`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param name See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { procedureBoolean } from 'hikkaku/blocks'
+ *
+ * procedureBoolean(undefined as any)
+ * ```
+ */
 export const procedureBoolean = <T extends string>(
   name: T,
 ): ProcedureProcBoolean<T> => {
@@ -37,6 +67,21 @@ export const procedureBoolean = <T extends string>(
   }
 }
 
+/**
+ * String/number argument fragment.
+ *
+ * Input: `name`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param name See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { procedureStringOrNumber } from 'hikkaku/blocks'
+ *
+ * procedureStringOrNumber(undefined as any)
+ * ```
+ */
 export const procedureStringOrNumber = <T extends string>(
   name: T,
 ): ProcedureProcStringOrNumber<T> => {
@@ -78,6 +123,24 @@ type ReferencesByProcs<T extends ProcedureProc[]> = {
     : never
 }
 
+/**
+ * Defines a custom procedure.
+ *
+ * Input: `proclist`, `stack`, `the`, `but`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param proclist ProcedureProc[]
+ * @param stack (references) => void Optional.
+ * @param the Input value used by this block.
+ * @param but Input value used by this block.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { defineProcedure } from 'hikkaku/blocks'
+ *
+ * defineProcedure(list as any, () => {}, undefined as any, undefined as any)
+ * ```
+ */
 export const defineProcedure = <T extends ProcedureProc[]>(
   proclist: T,
   stack?: (references: ReferencesByProcs<T>) => void,
@@ -161,6 +224,24 @@ export const defineProcedure = <T extends ProcedureProc[]>(
   return definition
 }
 
+/**
+ * Calls a custom procedure.
+ *
+ * Input: `proccode`, `argumentIds`, `inputs`, `warp`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param proccode See function signature for accepted input values.
+ * @param argumentIds See function signature for accepted input values.
+ * @param inputs See function signature for accepted input values.
+ * @param warp See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { callProcedure } from 'hikkaku/blocks'
+ *
+ * callProcedure([] as any, undefined as any, undefined as any, undefined as any)
+ * ```
+ */
 export const callProcedure = (
   proccode: string,
   argumentIds: string[],
@@ -186,6 +267,21 @@ export const callProcedure = (
   })
 }
 
+/**
+ * Reporter for string/number argument.
+ *
+ * Input: `reference`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param reference See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { argumentReporterStringNumber } from 'hikkaku/blocks'
+ *
+ * argumentReporterStringNumber(reference as any)
+ * ```
+ */
 export const argumentReporterStringNumber = (
   reference: ProcedureStringOrNumberReference,
 ) => {
@@ -196,6 +292,21 @@ export const argumentReporterStringNumber = (
   })
 }
 
+/**
+ * Reporter for boolean argument.
+ *
+ * Input: `reference`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param reference See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { argumentReporterBoolean } from 'hikkaku/blocks'
+ *
+ * argumentReporterBoolean(reference as any)
+ * ```
+ */
 export const argumentReporterBoolean = (
   reference: ProcedureBooleanReference,
 ) => {

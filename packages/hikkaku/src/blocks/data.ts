@@ -14,6 +14,21 @@ const toField = (field: VariableReference | ListReference): Fields => [
   field.id,
 ]
 
+/**
+ * Returns the value of a variable.
+ *
+ * Input: `variable`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param variable VariableReference
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getVariable } from 'hikkaku/blocks'
+ *
+ * getVariable(variable as any)
+ * ```
+ */
 export const getVariable = (variable: VariableReference) => {
   return valueBlock('data_variable', {
     fields: {
@@ -22,6 +37,22 @@ export const getVariable = (variable: VariableReference) => {
   })
 }
 
+/**
+ * Sets a variable.
+ *
+ * Input: `variable`, `value`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param variable VariableReference
+ * @param value PrimitiveSource<number | string>
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { setVariableTo } from 'hikkaku/blocks'
+ *
+ * setVariableTo(variable as any, 10)
+ * ```
+ */
 export const setVariableTo = (
   variable: VariableReference,
   value: PrimitiveSource<number | string>,
@@ -36,6 +67,22 @@ export const setVariableTo = (
   })
 }
 
+/**
+ * Changes a variable by an amount.
+ *
+ * Input: `variable`, `value`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param variable VariableReference
+ * @param value PrimitiveSource<number>
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { changeVariableBy } from 'hikkaku/blocks'
+ *
+ * changeVariableBy(variable as any, 10)
+ * ```
+ */
 export const changeVariableBy = (
   variable: VariableReference,
   value: PrimitiveSource<number>,
@@ -50,6 +97,21 @@ export const changeVariableBy = (
   })
 }
 
+/**
+ * Shows variable monitor.
+ *
+ * Input: `variable`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param variable See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { showVariable } from 'hikkaku/blocks'
+ *
+ * showVariable(variable as any)
+ * ```
+ */
 export const showVariable = (variable: VariableReference) => {
   return block('data_showvariable', {
     fields: {
@@ -58,6 +120,21 @@ export const showVariable = (variable: VariableReference) => {
   })
 }
 
+/**
+ * Hides variable monitor.
+ *
+ * Input: `variable`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param variable See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { hideVariable } from 'hikkaku/blocks'
+ *
+ * hideVariable(variable as any)
+ * ```
+ */
 export const hideVariable = (variable: VariableReference) => {
   return block('data_hidevariable', {
     fields: {
@@ -66,6 +143,21 @@ export const hideVariable = (variable: VariableReference) => {
   })
 }
 
+/**
+ * Returns list contents as text.
+ *
+ * Input: `list`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param list ListReference
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getListContents } from 'hikkaku/blocks'
+ *
+ * getListContents(list as any)
+ * ```
+ */
 export const getListContents = (list: ListReference) => {
   return valueBlock('data_listcontents', {
     fields: {
@@ -74,6 +166,22 @@ export const getListContents = (list: ListReference) => {
   })
 }
 
+/**
+ * Appends an item.
+ *
+ * Input: `list`, `item`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list ListReference
+ * @param item PrimitiveSource<string | number>
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { addToList } from 'hikkaku/blocks'
+ *
+ * addToList(list as any, undefined as any)
+ * ```
+ */
 export const addToList = (
   list: ListReference,
   item: PrimitiveSource<string | number>,
@@ -88,6 +196,22 @@ export const addToList = (
   })
 }
 
+/**
+ * Deletes an item.
+ *
+ * Input: `list`, `index`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list Input value used by this block.
+ * @param index PrimitiveSource<number | string>
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { deleteOfList } from 'hikkaku/blocks'
+ *
+ * deleteOfList(list as any, undefined as any)
+ * ```
+ */
 export const deleteOfList = (list: ListReference, index: ListIndex) => {
   return block('data_deleteoflist', {
     inputs: {
@@ -99,6 +223,21 @@ export const deleteOfList = (list: ListReference, index: ListIndex) => {
   })
 }
 
+/**
+ * Clears list.
+ *
+ * Input: `list`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { deleteAllOfList } from 'hikkaku/blocks'
+ *
+ * deleteAllOfList(list as any)
+ * ```
+ */
 export const deleteAllOfList = (list: ListReference) => {
   return block('data_deletealloflist', {
     fields: {
@@ -107,6 +246,23 @@ export const deleteAllOfList = (list: ListReference) => {
   })
 }
 
+/**
+ * Inserts item at index.
+ *
+ * Input: `list`, `index`, `item`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list See function signature for accepted input values.
+ * @param index See function signature for accepted input values.
+ * @param item See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { insertAtList } from 'hikkaku/blocks'
+ *
+ * insertAtList(list as any, undefined as any, undefined as any)
+ * ```
+ */
 export const insertAtList = (
   list: ListReference,
   index: ListIndex,
@@ -123,6 +279,23 @@ export const insertAtList = (
   })
 }
 
+/**
+ * Replaces item at index.
+ *
+ * Input: `list`, `index`, `item`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list See function signature for accepted input values.
+ * @param index See function signature for accepted input values.
+ * @param item See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { replaceItemOfList } from 'hikkaku/blocks'
+ *
+ * replaceItemOfList(list as any, undefined as any, undefined as any)
+ * ```
+ */
 export const replaceItemOfList = (
   list: ListReference,
   index: ListIndex,
@@ -139,6 +312,22 @@ export const replaceItemOfList = (
   })
 }
 
+/**
+ * Returns list item.
+ *
+ * Input: `list`, `index`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param list See function signature for accepted input values.
+ * @param index See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getItemOfList } from 'hikkaku/blocks'
+ *
+ * getItemOfList(list as any, undefined as any)
+ * ```
+ */
 export const getItemOfList = (list: ListReference, index: ListIndex) => {
   return valueBlock('data_itemoflist', {
     inputs: {
@@ -150,6 +339,22 @@ export const getItemOfList = (list: ListReference, index: ListIndex) => {
   })
 }
 
+/**
+ * Returns index of item.
+ *
+ * Input: `list`, `item`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param list See function signature for accepted input values.
+ * @param item See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { getItemNumOfList } from 'hikkaku/blocks'
+ *
+ * getItemNumOfList(list as any, undefined as any)
+ * ```
+ */
 export const getItemNumOfList = (
   list: ListReference,
   item: PrimitiveSource<string | number>,
@@ -164,6 +369,21 @@ export const getItemNumOfList = (
   })
 }
 
+/**
+ * Returns list length.
+ *
+ * Input: `list`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param list See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { lengthOfList } from 'hikkaku/blocks'
+ *
+ * lengthOfList(list as any)
+ * ```
+ */
 export const lengthOfList = (list: ListReference) => {
   return valueBlock('data_lengthoflist', {
     fields: {
@@ -172,6 +392,22 @@ export const lengthOfList = (list: ListReference) => {
   })
 }
 
+/**
+ * Checks membership.
+ *
+ * Input: `list`, `item`.
+ * Output: Scratch reporter block definition that can be used as an input value in other blocks.
+ *
+ * @param list See function signature for accepted input values.
+ * @param item See function signature for accepted input values.
+ * @returns Scratch reporter block definition that can be used as an input value in other blocks.
+ * @example
+ * ```ts
+ * import { listContainsItem } from 'hikkaku/blocks'
+ *
+ * listContainsItem(list as any, undefined as any)
+ * ```
+ */
 export const listContainsItem = (
   list: ListReference,
   item: PrimitiveSource<string | number>,
@@ -186,6 +422,21 @@ export const listContainsItem = (
   })
 }
 
+/**
+ * Shows list monitor.
+ *
+ * Input: `list`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { showList } from 'hikkaku/blocks'
+ *
+ * showList(list as any)
+ * ```
+ */
 export const showList = (list: ListReference) => {
   return block('data_showlist', {
     fields: {
@@ -194,6 +445,21 @@ export const showList = (list: ListReference) => {
   })
 }
 
+/**
+ * Hides list monitor.
+ *
+ * Input: `list`.
+ * Output: Scratch statement block definition that is appended to the current script stack.
+ *
+ * @param list See function signature for accepted input values.
+ * @returns Scratch statement block definition that is appended to the current script stack.
+ * @example
+ * ```ts
+ * import { hideList } from 'hikkaku/blocks'
+ *
+ * hideList(list as any)
+ * ```
+ */
 export const hideList = (list: ListReference) => {
   return block('data_hidelist', {
     fields: {
