@@ -18,9 +18,10 @@ globalThis.hk = {
 }
 
 import.meta.hot?.on('hikkaku:project', async (project: sb3.ScratchProject) => {
-  await state.vm.loadProject(project)
-  
-  state.scratchBlocks.getMainWorkspace().cleanUp()
-  setTimeout(() => {
-  }, 100)
+  console.log('Received updated project:', project)
+  await state.vm.loadProject(project).catch(console.error)
+  console.log('Project loaded.')
+
+  //state.scratchBlocks.getMainWorkspace().cleanUp()
+  setTimeout(() => {}, 100)
 })

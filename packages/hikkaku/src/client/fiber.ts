@@ -95,6 +95,11 @@ export const getScratchInternalStates = (root: ScratchRoot) => {
     }
     return false
   })
+
+  // アセットのロードをパッチする
+  // 0を削除
+  vm.runtime.storage.webHelper.assetTool.tools.splice(0, 1)
+
   // @ts-expect-error scratchBlocksFiber existence checked
   const scratchBlocks = scratchBlocksFiber.stateNode.ScratchBlocks as {
     getMainWorkspace: () => {

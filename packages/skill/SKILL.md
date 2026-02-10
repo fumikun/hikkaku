@@ -12,8 +12,12 @@ This document provides best practices for using Hikkaku to create Scratch projec
 
 ## SKILL Structure
 
-* './guides/usage.md': Basic usage of Hikkaku.
-* './guides/variable-usage.md': How to create and use variables and lists.
-* './guides/custom-blocks-usage.md': How to define and call custom blocks (procedures).
-* './guides/blocks/overview.md': List of available blocks and common concepts.
-* './guides/blocks/*': Block references split by category (control, data, events, looks, motion, operator, procedures, sensing, sound).
+* `rules/`: Contains individual rules or guidelines for using Hikkaku effectively.
+  * `blocks/*.md`: Guidelines for using specific blocks in Hikkaku.
+    * e.g., `control.md`, `data.md`, `motion.md`, etc.
+  * `clone.md`: Guidelines for using clones in Hikkaku.
+  * `custom-blocks.md`: Guidelines for creating and using custom blocks.
+  * `physics.md`: Guidelines for implementing 2d physics in Scratch projects.
+  * `positioning.md`: Rules for positioning systems in Scratch projects.
+  * `usage.md`: General usage guidelines for Hikkaku.
+  * `variable.md`: Rules for using variables and lists in Hikkaku.

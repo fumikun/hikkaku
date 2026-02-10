@@ -1,4 +1,3 @@
-import type * as sb3 from '@pnsk-lab/sb3-types'
 import { createServerModuleRunner, type PluginOption } from 'vite'
 import type { ModuleRunner } from 'vite/module-runner'
 import type { Project } from '../core'
@@ -39,7 +38,10 @@ export default function hikkaku(init: HikkakuViteInit): PluginOption {
         throw new Error('Module runner is not initialized.')
       }
       const project: Project = (await runner.import(options.file)).default
-      options.server.environments.client.hot.send('hikkaku:project', project.toScratch())
+      options.server.environments.client.hot.send(
+        'hikkaku:project',
+        project.toScratch(),
+      )
     },
     async configureServer(server) {
       const hikkakuEnv = server.environments.hikkaku
@@ -54,7 +56,10 @@ export default function hikkaku(init: HikkakuViteInit): PluginOption {
           throw new Error('Module runner is not initialized.')
         }
         const project: Project = (await runner.import(init.entry)).default
-        server.environments.client.hot.send('hikkaku:project', project.toScratch())
+        server.environments.client.hot.send(
+          'hikkaku:project',
+          project.toScratch(),
+        )
       })
 
       server.middlewares.use(async (req, res, next) => {
@@ -72,7 +77,16 @@ export default function hikkaku(init: HikkakuViteInit): PluginOption {
           res.end(html)
           return
         }
-        if (req.url?.startsWith('/static/')) {
+        if (
+          req.url?.startsWith('/static/') ||
+          req.url?.startsWith('/js/') ||
+          req.url?.startsWith('/css/') ||
+          req.url?.startsWith('/svgs') ||
+          req.url?.startsWith('/images/') ||
+          req.url?.startsWith('/session/') ||
+          req.url === '/common.css' ||
+          req.url === '/projects.css'
+        ) {
           const url = new URL(req.url.slice(1), BASE_URL)
           const response = await fetch(url.toString())
           if (!response.ok) {

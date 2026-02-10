@@ -1,6 +1,7 @@
 ---
 title: "Physics for Scratch Platformers (Hikkaku)"
 description: "Collision, pseudo-physics, scrolling, and tiles for Scratch-style platformers."
+impact: LOW
 ---
 
 # Physics for Scratch Platformers (Hikkaku)

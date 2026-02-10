@@ -1,6 +1,6 @@
 ---
 title: Custom Blocks Usage
-impact: HIGH
+impact: MEDIUM
 ---
 
 # Custom Blocks (Procedures)

@@ -125,7 +125,8 @@ export const stop = (option: StopOption) => {
   })
 }
 
-export const createClone = (target: string) => {
+export const CREATE_CLONE_MYSELF = '_myself_'
+export const createClone = (target: PrimitiveSource<string>) => {
   return block('control_create_clone_of', {
     inputs: {
       CLONE_OPTION: fromPrimitiveSource(target),

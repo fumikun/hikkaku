@@ -4,4 +4,16 @@ export interface ScratchVM {
   blockListener: () => void
   loadProject: (project: sb3.ScratchProject | string) => Promise<void>
   toJSON: () => sb3.ScratchProject
+  runtime: {
+    storage: ScratchStorage
+  }
+}
+export interface ScratchStorage {
+  webHelper: {
+    assetTool: {
+      tools: {
+        get: (...args: unknown[]) => Promise<unknown>
+      }[]
+    }
+  }
 }

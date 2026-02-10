@@ -7,7 +7,7 @@ impact: HIGH
 
 ```ts
 import { Project } from 'hikkaku'
-import { ASSET_CAT1, ASSET_CAT2, Project } from 'hikkaku'
+import { CATCHER_A } from 'hikkaku/assets'
 import {
   getMouseX,
   gotoXY,
@@ -21,9 +21,8 @@ const project = new Project()
 
 const sprite1 = project.createSprite('Sprite1') // create sprite
 const cat1 = sprite1.addCostume({
+  ...CATCHER_A,
   name: 'cat1',
-  assetId: ASSET_CAT1,
-  dataFormat: 'svg',
 }) // create costume
 
 sprite1.run(() => {
@@ -49,10 +48,11 @@ Stage is a background area where sprites perform actions. The stage is created a
 ```ts
 const stage = project.stage // get stage
 const bg1 = stage.addCostume({
-  // it is same as sprite
+  ...CATCHER_A,
+  name: 'bg1',
 })
 
-bg1.run(() => {
+stage.run(() => {
   whenFlagClicked(() => {
     switchCostumeTo(bg1) // switch stage costume
   })
