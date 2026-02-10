@@ -1745,28 +1745,6 @@ parser.run(() => {
     true,
   )
 
-  whenFlagClicked(() => {
-    showList(queryResult)
-
-    // Sample JSON data to parse
-    const sampleJSON = '{"name":"Alice","age":30,"items":[1,2,3]}'
-
-    // Parse the JSON
-    const parseArgId = parseProcedure.argumentIds[0] as string
-    parseProcedure.call({ [parseArgId]: sampleJSON })
-
-    // Query the data (examples)
-    const getArgId = getProcedure.argumentIds[0] as string
-
-    // Get name: .name
-    getProcedure.call({ [getArgId]: '.name' })
-
-    // Get age: .age
-    getProcedure.call({ [getArgId]: '.age' })
-
-    // Get first item from array: .items[0]
-    getProcedure.call({ [getArgId]: '.items[0]' })
-  })
 })
 
 export { getProcCode, parseProcCode, queryResult }
