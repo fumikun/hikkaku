@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "NODE_ENV=development vite",
     "typecheck": "tsgo",
-    "build": "vite build"
+    "build": "vite build",
+    "train:nn": "python3 tools/train_reversi_nn.py --games 4000 --output-json src/nn-weights.json --output-ts src/nnWeights.ts"
   },
   "dependencies": {
     "hikkaku": "workspace:*"
