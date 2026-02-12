@@ -1659,7 +1659,7 @@ renderer.run(() => {
       true,
     )
 
-    // Detects mouse clicks for play/pause, clip selection, and roll editing; ensures clicks only trigger once per press.
+    // Detects mouse clicks for play/stop, clip selection, and roll editing; ensures clicks only trigger once per press.
     const handleInput = defineProcedure(
       [procedureLabel('handle input')],
       () => {
@@ -3073,47 +3073,99 @@ renderer.run(() => {
           '#f8fafc',
         )
 
-        drawRect(
-          PLAY_BTN_LEFT,
-          PLAY_BTN_BOTTOM,
-          PLAY_BTN_RIGHT,
-          PLAY_BTN_TOP,
-          '#1a2432',
-        )
-        drawHorizontal(
-          PLAY_BTN_LEFT,
-          PLAY_BTN_RIGHT,
-          PLAY_BTN_TOP,
-          2,
-          '#3b4556',
-        )
-        drawHorizontal(
-          PLAY_BTN_LEFT,
-          PLAY_BTN_RIGHT,
-          PLAY_BTN_BOTTOM,
-          2,
-          '#3b4556',
-        )
-        drawVertical(PLAY_BTN_LEFT, PLAY_BTN_TOP, PLAY_BTN_BOTTOM, 2, '#3b4556')
-        drawVertical(
-          PLAY_BTN_RIGHT,
-          PLAY_BTN_TOP,
-          PLAY_BTN_BOTTOM,
-          2,
-          '#3b4556',
-        )
-
         ifElse(
           equals(isPlaying.get(), 1),
           () => {
-            drawRect(207, 73, 210, 81, '#f8fafc')
-            drawRect(216, 73, 219, 81, '#f8fafc')
+            drawRect(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_BOTTOM,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              '#7f1d1d',
+            )
+            drawHorizontal(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              2,
+              '#ef4444',
+            )
+            drawHorizontal(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#ef4444',
+            )
+            drawVertical(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_TOP,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#ef4444',
+            )
+            drawVertical(
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#ef4444',
+            )
+            drawRect(198, 74, 202, 80, '#fee2e2')
+            setVariableTo(textRenderScale, 1)
+            setVariableTo(textRenderColor, '#fee2e2')
+            setVariableTo(textRenderValue, 'STOP')
+            setVariableTo(textRenderX, 207)
+            setVariableTo(textRenderY, 80)
+            callProcedure(drawPixelText, {})
           },
           () => {
-            drawHorizontal(208, 214, 81, 2, '#f8fafc')
-            drawHorizontal(208, 217, 78, 2, '#f8fafc')
-            drawHorizontal(208, 220, 75, 2, '#f8fafc')
-            drawHorizontal(208, 217, 72, 2, '#f8fafc')
+            drawRect(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_BOTTOM,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              '#14532d',
+            )
+            drawHorizontal(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              2,
+              '#22c55e',
+            )
+            drawHorizontal(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#22c55e',
+            )
+            drawVertical(
+              PLAY_BTN_LEFT,
+              PLAY_BTN_TOP,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#22c55e',
+            )
+            drawVertical(
+              PLAY_BTN_RIGHT,
+              PLAY_BTN_TOP,
+              PLAY_BTN_BOTTOM,
+              2,
+              '#22c55e',
+            )
+            drawHorizontal(198, 201, 80, 1, '#dcfce7')
+            drawHorizontal(198, 202, 79, 1, '#dcfce7')
+            drawHorizontal(198, 203, 78, 1, '#dcfce7')
+            drawHorizontal(198, 202, 77, 1, '#dcfce7')
+            drawHorizontal(198, 201, 76, 1, '#dcfce7')
+            setVariableTo(textRenderScale, 1)
+            setVariableTo(textRenderColor, '#dcfce7')
+            setVariableTo(textRenderValue, 'PLAY')
+            setVariableTo(textRenderX, 207)
+            setVariableTo(textRenderY, 80)
+            callProcedure(drawPixelText, {})
           },
         )
       },
