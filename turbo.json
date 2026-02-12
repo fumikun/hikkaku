@@ -13,9 +13,9 @@
       "outputs": ["src/blocks/**"]
     },
     "docs:build": {
-      "outputs": [".vitepress/dist/**"],
       "cache": true,
-      "dependsOn": ["hikkaku#build"]
+      "outputs": [".vitepress/dist/**"],
+      "dependsOn": ["hikkaku-docs#build", "hikkaku#build"]
     }
   }
 }
