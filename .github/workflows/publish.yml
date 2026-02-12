@@ -139,6 +139,14 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure workflow runs on branch
+        run: |
+          if [[ '${{ github.ref_type }}' != 'branch' ]]; then
+            echo "This workflow must run on a branch ref to push version updates."
+            echo "Current ref_type: ${{ github.ref_type }}"
+            exit 1
+          fi
+
       - name: Update package version
         run: |
           node -e "const fs=require('fs');const path='packages/${{ steps.metadata.outputs.package }}/package.json';const version='${{ steps.metadata.outputs.version }}';const pkg=JSON.parse(fs.readFileSync(path,'utf8'));pkg.version=version;const hasPrivate=Object.prototype.hasOwnProperty.call(pkg,'private');if(hasPrivate&&(pkg.name==='create-hikkaku'||pkg.name==='vite-plugin-turbowarp-packager')){pkg.private=false;}fs.writeFileSync(path,JSON.stringify(pkg,null,2)+'\n');"
@@ -159,20 +167,72 @@ jobs:
         if: steps.metadata.outputs.package == 'hikkaku'
         run: bun run --filter gpts-zip build
 
-      - name: Publish hikkaku to npm
-        if: steps.metadata.outputs.package == 'hikkaku'
-        run: npm publish --provenance --access public
-        working-directory: packages/hikkaku/dist
+      - name: Resolve publish directory
+        id: publish_dir
+        shell: bash
+        run: |
+          case '${{ steps.metadata.outputs.package }}' in
+            hikkaku)
+              dir='packages/hikkaku/dist'
+              ;;
+            create-hikkaku)
+              dir='packages/create-hikkaku'
+              ;;
+            vite-plugin-turbowarp-packager)
+              dir='packages/vite-plugin-turbowarp-packager'
+              ;;
+            *)
+              echo "Unsupported package: ${{ steps.metadata.outputs.package }}"
+              exit 1
+              ;;
+          esac
 
-      - name: Publish create-hikkaku to npm
-        if: steps.metadata.outputs.package == 'create-hikkaku'
-        run: npm publish --provenance --access public
-        working-directory: packages/create-hikkaku
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
-      - name: Publish vite-plugin-turbowarp-packager to npm
-        if: steps.metadata.outputs.package == 'vite-plugin-turbowarp-packager'
-        run: npm publish --provenance --access public
-        working-directory: packages/vite-plugin-turbowarp-packager
+      - name: Pack package tarball
+        id: pack
+        shell: bash
+        run: |
+          publish_dir='${{ steps.publish_dir.outputs.dir }}'
+          tarball_output="$(cd "$publish_dir" && bun pm pack --quiet --destination "$RUNNER_TEMP")"
+          tarball_output="$(echo "$tarball_output" | tr -d '\n')"
+
+          if [[ "$tarball_output" = /* ]]; then
+            tarball_path="$tarball_output"
+          else
+            tarball_path="$RUNNER_TEMP/$tarball_output"
+          fi
+
+          if [[ ! -f "$tarball_path" ]]; then
+            echo "Tarball was not generated at expected path: $tarball_path"
+            exit 1
+          fi
+
+          echo "path=$tarball_path" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package tarball to npm
+        run: npm publish '${{ steps.pack.outputs.path }}' --provenance --access public
+
+      - name: Commit and push version update
+        id: version_commit
+        shell: bash
+        run: |
+          file_path="packages/${{ steps.metadata.outputs.package }}/package.json"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add "$file_path"
+
+          if git diff --cached --quiet; then
+            echo "No version updates to commit."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git commit -m 'chore(release): bump ${{ steps.metadata.outputs.package }} to v${{ steps.metadata.outputs.version }}'
+          git push origin "HEAD:${{ github.ref_name }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create release with generated notes
         run: |
@@ -180,9 +240,9 @@ jobs:
             gh release create '${{ steps.metadata.outputs.tag }}' \
               'packages/gpts-zip/dist.zip#gpts.zip' \
               --generate-notes \
-              --target '${{ github.sha }}'
+              --target '${{ steps.version_commit.outputs.sha }}'
           else
             gh release create '${{ steps.metadata.outputs.tag }}' \
               --generate-notes \
-              --target '${{ github.sha }}'
+              --target '${{ steps.version_commit.outputs.sha }}'
           fi
