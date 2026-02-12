@@ -29,7 +29,7 @@
   "dependencies": {
     "@turbowarp/packager": "^3.11.0",
     "fflate": "^0.8.2",
-    "hikkaku": "workspace:*",
+    "hikkaku": "^0.2.0",
     "vite": "8.0.0-beta.13"
   }
 }
