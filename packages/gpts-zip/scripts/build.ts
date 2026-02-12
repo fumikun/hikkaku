@@ -3,6 +3,7 @@
 import { mkdir } from 'node:fs/promises'
 import { $ } from 'bun'
 
+await $`rm -rf .tmp/`
 await mkdir('.tmp', { recursive: true })
 
 // skills をコピーしてくる
