@@ -9,6 +9,7 @@ Use this section when you need exact block helper signatures and behavior.
 - [Data](/reference/blocks/data)
 - [Events](/reference/blocks/events)
 - [Looks](/reference/blocks/looks)
+- [Music](/reference/blocks/music)
 - [Motion](/reference/blocks/motion)
 - [Operators](/reference/blocks/operator)
 - [Pen](/reference/blocks/pen)

@@ -30,6 +30,7 @@ import { add, gotoXY } from 'hikkaku/blocks'
 - [Data](rules/blocks/data.md)
 - [Events](rules/blocks/events.md)
 - [Looks](rules/blocks/looks.md)
+- [Music](rules/blocks/music.md)
 - [Motion](rules/blocks/motion.md)
 - [Operator](rules/blocks/operator.md)
 - [Procedures](rules/blocks/procedures.md)
