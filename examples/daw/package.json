@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "name": "daw",
-=======
-  "name": "daw-example",
->>>>>>> 690807f9ea7c206e9851219f36069d3aac4c870c
   "private": true,
   "type": "module",
   "scripts": {
