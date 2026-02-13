@@ -6,7 +6,7 @@
     "dev": "NODE_ENV=development vite",
     "typecheck": "tsgo",
     "build": "bun run example:build",
-    "example:build": "bun --bun vite build"
+    "example:build": "vite build"
   },
   "dependencies": {
     "hikkaku": "workspace:*"

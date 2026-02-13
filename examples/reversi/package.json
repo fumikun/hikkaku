@@ -7,7 +7,7 @@
     "typecheck": "tsgo",
     "build": "bun run example:build",
     "train:nn": "python3 tools/train_reversi_nn.py --games 4000 --output-json src/nn-weights.json --output-ts src/nnWeights.ts",
-    "example:build": "bun --bun vite build"
+    "example:build": "vite build"
   },
   "dependencies": {
     "hikkaku": "workspace:*"
