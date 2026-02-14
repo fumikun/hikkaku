@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directories:
+      - "/"
+      - "/packages/*"
+      - "/examples/*"
+      - "/templates/*"
+      - "/docs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
