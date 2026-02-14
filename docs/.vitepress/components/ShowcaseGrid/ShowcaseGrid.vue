@@ -37,6 +37,7 @@
 import { withBase } from 'vitepress'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { parseManifestAuthor, type ShowcaseEntry } from './types'
+import ShowcaseCard from './ShowcaseCard.vue'
 
 const entries = ref<ShowcaseEntry[]>([])
 const error = ref('')
