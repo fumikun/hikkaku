@@ -233,7 +233,7 @@ const BlocklyLoading = defineComponent({
   },
 })
 
-const BlocklyAsync = defineAsyncComponent({
+const _BlocklyAsync = defineAsyncComponent({
   loader: () => import('./Blockly.vue'),
   loadingComponent: BlocklyLoading,
   delay: 0,
@@ -263,7 +263,7 @@ const resizeObserver = shallowRef<ResizeObserver | null>(null)
 const output = ref('')
 const error = ref('')
 const isInitialLoading = ref(true)
-const activeOutputTab = ref<'json' | 'blocks'>('blocks')
+const _activeOutputTab = ref<'json' | 'blocks'>('blocks')
 const compiledProject = ref<ScratchProjectJsonLike | null>(null)
 const selectedTargetKey = ref<string | null>(null)
 let runDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -328,11 +328,11 @@ const selectedTarget = computed<ScratchTargetView | null>(() => {
   )
 })
 
-const selectedTargetLabel = computed(
+const _selectedTargetLabel = computed(
   () => selectedTarget.value?.name ?? 'Target',
 )
 
-const selectedTargetBlocks = computed<PackedBlockMap | null>(() => {
+const _selectedTargetBlocks = computed<PackedBlockMap | null>(() => {
   const blocks = selectedTarget.value?.blocks
   return isPackedBlockMap(blocks) ? { ...blocks } : null
 })
