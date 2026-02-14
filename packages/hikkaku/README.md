@@ -4,6 +4,8 @@
 
 [![NPM Version](https://img.shields.io/npm/v/hikkaku)](https://www.npmjs.com/package/hikkaku)
 
+[Docs](https://pnsk-lab.github.io/hikkaku/) | [Playground](https://pnsk-lab.github.io/playground/)
+
 Scratch with TypeScript.
 
 ## Installation
@@ -150,4 +152,7 @@ npx skills add pnsk-lab/hikkaku/packages/skill # npm
 
 ### Build project
 
-Not support yet. To get .sb3 file, you need to download the project file using dev server, or manually convert JSON to .sb3 using external tools.
+With Vite Plugin:
+```ts
+vite build
+```
