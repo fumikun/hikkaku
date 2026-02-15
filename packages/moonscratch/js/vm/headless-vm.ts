@@ -1,5 +1,6 @@
+import { normalizeRenderFrame } from '../render/index.ts'
 import { moonscratch } from './bindings.ts'
-import { DEFAULT_STEP_MS } from './constants.ts'
+import { DEFAULT_MAX_FRAMES } from './constants.ts'
 import {
   isMusicPlayDrumEffect,
   isMusicPlayNoteEffect,
@@ -10,17 +11,29 @@ import { parseJson } from './json.ts'
 import {
   cloneTranslateCache,
   normalizeLanguage,
-  normalizeStepMs,
-  toStepReport,
+  normalizeMaxFrames,
+  normalizeNowMs,
+  toFrameReport,
 } from './normalize.ts'
 import type {
   EffectHandlers,
+  FrameReport,
   JsonValue,
-  StepReport,
+  RenderFrame,
+  RenderFrameLike,
+  RunReport,
+  RunUntilIdleOptions,
   TranslateCache,
   VMEffect,
+  VMInputEvent,
   VMSnapshot,
 } from './types.ts'
+
+type BoundWasmVmHandle = unknown
+type BoundMoonscratch = {
+  vm_set_time?: (vmHandle: BoundWasmVmHandle, nowMs: number) => void
+  vm_render_frame?: (vmHandle: BoundWasmVmHandle) => unknown
+}
 
 export class HeadlessVM {
   private readonly vmHandle: unknown
@@ -42,9 +55,55 @@ export class HeadlessVM {
     moonscratch.vm_green_flag(this.vmHandle)
   }
 
-  step(dtMs = DEFAULT_STEP_MS): StepReport {
-    const raw = moonscratch.vm_step(this.vmHandle, normalizeStepMs(dtMs))
-    return toStepReport(raw)
+  stepFrame(): FrameReport {
+    const raw = moonscratch.vm_step_frame(this.vmHandle)
+    return toFrameReport(raw)
+  }
+
+  runFrames(frameCount: number): RunReport {
+    const normalizedFrameCount = normalizeMaxFrames(frameCount)
+    let frames = 0
+    let ticks = 0
+    let ops = 0
+    let activeThreads = this.snapshot().activeThreads
+    while (activeThreads > 0 && frames < normalizedFrameCount) {
+      const frame = this.stepFrame()
+      frames += 1
+      ticks += frame.ticks
+      ops += frame.ops
+      activeThreads = frame.activeThreads
+    }
+    return {
+      frames,
+      ticks,
+      ops,
+      activeThreads,
+      endedBy: 'frame_limit',
+    }
+  }
+
+  runUntilIdle(options: RunUntilIdleOptions = {}): RunReport {
+    const normalizedMaxFrames = normalizeMaxFrames(
+      options.maxFrames ?? DEFAULT_MAX_FRAMES,
+    )
+    let frames = 0
+    let ticks = 0
+    let ops = 0
+    let activeThreads = this.snapshot().activeThreads
+    while (activeThreads > 0 && frames < normalizedMaxFrames) {
+      const frame = this.stepFrame()
+      frames += 1
+      ticks += frame.ticks
+      ops += frame.ops
+      activeThreads = frame.activeThreads
+    }
+    return {
+      frames,
+      ticks,
+      ops,
+      activeThreads,
+      endedBy: activeThreads === 0 ? 'idle' : 'frame_limit',
+    }
   }
 
   postIO(device: string, payload: JsonValue): void {
@@ -56,11 +115,15 @@ export class HeadlessVM {
   }
 
   setAnswer(answer: string): void {
-    this.postIO('answer', answer)
+    this.dispatchInputEvent({
+      type: 'answer',
+      answer,
+    })
   }
 
   setMouseState(input: { x: number; y: number; isDown?: boolean }): void {
-    this.postIO('mouse', {
+    this.dispatchInputEvent({
+      type: 'mouse',
       x: input.x,
       y: input.y,
       isDown: input.isDown ?? false,
@@ -68,11 +131,86 @@ export class HeadlessVM {
   }
 
   setKeysDown(keys: string[]): void {
-    this.postIO('keys_down', keys)
+    this.dispatchInputEvent({
+      type: 'keys_down',
+      keys,
+    })
   }
 
   setTouching(touching: Record<string, string[]>): void {
-    this.postIO('touching', touching)
+    this.dispatchInputEvent({
+      type: 'touching',
+      touching,
+    })
+  }
+
+  setMouseTargets(input: {
+    stage?: boolean
+    target?: string
+    targets?: string[]
+  }): void {
+    this.dispatchInputEvent({
+      type: 'mouse_targets',
+      stage: input.stage,
+      target: input.target,
+      targets: input.targets,
+    })
+  }
+
+  setBackdrop(backdrop: string | string[]): void {
+    this.dispatchInputEvent({
+      type: 'backdrop',
+      backdrop,
+    })
+  }
+
+  dispatchInputEvents(events: VMInputEvent[]): void {
+    for (const event of events) {
+      this.dispatchInputEvent(event)
+    }
+  }
+
+  dispatchInputEvent(event: VMInputEvent): void {
+    switch (event.type) {
+      case 'answer':
+        this.postIO('answer', event.answer)
+        return
+      case 'mouse':
+        this.postIO('mouse', {
+          x: event.x,
+          y: event.y,
+          isDown: event.isDown ?? false,
+        })
+        return
+      case 'keys_down':
+        this.postIO('keys_down', event.keys)
+        return
+      case 'touching':
+        this.postIO('touching', event.touching)
+        return
+      case 'mouse_targets':
+        this.postIO('mouse_targets', {
+          stage: event.stage ?? false,
+          target: event.target ?? '',
+          targets: event.targets ?? [],
+        })
+        return
+      case 'backdrop':
+        if (Array.isArray(event.backdrop)) {
+          this.postIO('backdrop', {
+            backdrops: event.backdrop,
+          })
+          return
+        }
+        this.postIO('backdrop', {
+          backdrop: event.backdrop,
+        })
+        return
+      default: {
+        const unreachable: never = event
+        throw new Error(`Unknown input event: ${String(unreachable)}`)
+      }
+    }
   }
 
   broadcast(message: string): void {
@@ -81,6 +219,17 @@ export class HeadlessVM {
 
   stopAll(): void {
     moonscratch.vm_stop_all(this.vmHandle)
+  }
+
+  setTime(nowMs: number): void {
+    const binding = moonscratch as unknown as BoundMoonscratch
+    if (typeof binding.vm_set_time === 'function') {
+      binding.vm_set_time(this.vmHandle, normalizeNowMs(nowMs))
+      return
+    }
+    throw new Error(
+      'vm_set_time is unavailable in this build. Please rebuild moonscratch JS bindings.',
+    )
   }
 
   takeEffects(): VMEffect[] {
@@ -109,8 +258,16 @@ export class HeadlessVM {
     return moonscratch.vm_snapshot_json(this.vmHandle)
   }
 
-  renderSvg(): string {
-    return moonscratch.vm_render_svg(this.vmHandle)
+  renderFrame(): RenderFrame {
+    const binding = moonscratch as unknown as BoundMoonscratch
+    if (typeof binding.vm_render_frame !== 'function') {
+      throw new Error(
+        'vm_render_frame is unavailable in this build. Please rebuild moonscratch JS bindings.',
+      )
+    }
+    return normalizeRenderFrame(
+      binding.vm_render_frame(this.vmHandle) as RenderFrameLike,
+    )
   }
 
   setViewerLanguage(language: string): void {

@@ -17,6 +17,7 @@ export interface VMOptions {
   seed: number
   penWidth: number
   penHeight: number
+  stepTimeoutTicks: number
 }
 
 export interface VMOptionsInput extends Partial<VMOptions> {
@@ -24,14 +25,74 @@ export interface VMOptionsInput extends Partial<VMOptions> {
   max_clones?: number
   pen_width?: number
   pen_height?: number
+  step_timeout_ticks?: number
+  stepTimeoutTicks?: number
 }
 
-export interface StepReport {
-  nowMs: number
+export type FrameStopReason = 'finished' | 'timeout' | 'rerender' | 'warp-exit'
+
+export interface FrameReport {
   activeThreads: number
-  steppedThreads: number
+  ticks: number
+  ops: number
   emittedEffects: number
+  stopReason: FrameStopReason
+  shouldRender: boolean
+  isInWarp: boolean
 }
+
+export type RunEndedBy = 'idle' | 'frame_limit'
+
+export interface RunReport {
+  frames: number
+  ticks: number
+  ops: number
+  activeThreads: number
+  endedBy: RunEndedBy
+}
+
+export interface RunUntilIdleOptions {
+  maxFrames?: number
+}
+
+export type VMInputEvent =
+  | {
+      type: 'answer'
+      answer: string
+    }
+  | {
+      type: 'mouse'
+      x: number
+      y: number
+      isDown?: boolean
+    }
+  | {
+      type: 'keys_down'
+      keys: string[]
+    }
+  | {
+      type: 'touching'
+      touching: Record<string, string[]>
+    }
+  | {
+      type: 'mouse_targets'
+      stage?: boolean
+      target?: string
+      targets?: string[]
+    }
+  | {
+      type: 'backdrop'
+      backdrop: string | string[]
+    }
+
+export type {
+  RenderFrame,
+  RenderFrameLike,
+  RenderImageData,
+  RenderWithSharpOptions,
+  RenderWithWebGLOptions,
+  WebGLRenderResult,
+} from '../render/types.ts'
 
 export interface VMSnapshotTarget {
   id: string
@@ -163,10 +224,19 @@ export interface EffectHandlers {
   effect?: (effect: VMEffect) => MaybePromise<void>
 }
 
-export interface CreateHeadlessVMOptions {
+export interface PrecompiledProject {
+  raw: unknown
+}
+
+export interface CreatePrecompiledProjectOptions {
   projectJson: string | ProjectJson
   assets?: string | Record<string, JsonValue>
+}
+
+export interface CreateHeadlessVMOptions {
+  precompiled: PrecompiledProject
   options?: string | VMOptionsInput
+  initialNowMs?: number
   viewerLanguage?: string
   translateCache?: TranslateCache
 }
@@ -195,7 +265,9 @@ export interface ResolveMissingScratchAssetsOptions {
 }
 
 export interface CreateHeadlessVMWithScratchAssetsOptions
-  extends CreateHeadlessVMOptions {
+  extends Omit<CreateHeadlessVMOptions, 'precompiled'> {
+  projectJson: string | ProjectJson
+  assets?: string | Record<string, JsonValue>
   scratchCdnBaseUrl?: string
   fetchAsset?: FetchAsset
   decodeImageBytes?: DecodeImageBytes

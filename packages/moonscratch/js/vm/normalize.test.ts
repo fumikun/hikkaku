@@ -3,8 +3,9 @@ import { describe, expect, test } from 'vite-plus/test'
 import {
   cloneTranslateCache,
   normalizeLanguage,
-  normalizeStepMs,
-  toStepReport,
+  normalizeMaxFrames,
+  normalizeNowMs,
+  toFrameReport,
 } from './normalize.ts'
 
 describe('moonscratch/js/vm/normalize.ts', () => {
@@ -18,27 +19,30 @@ describe('moonscratch/js/vm/normalize.ts', () => {
     expect(cache).toEqual({ ja: { hello: 'こんにちは' } })
   })
 
-  test('normalizes step milliseconds', () => {
-    expect(normalizeStepMs(16.9)).toBe(16)
-    expect(normalizeStepMs(-1)).toBe(0)
-    expect(() => normalizeStepMs(Number.POSITIVE_INFINITY)).toThrow(
-      'dtMs must be a finite number',
-    )
+  test('normalizes frame inputs', () => {
+    expect(normalizeNowMs(16.9)).toBe(16)
+    expect(normalizeMaxFrames(10.7)).toBe(10)
   })
 
-  test('maps raw step report fields', () => {
+  test('maps raw frame report fields', () => {
     expect(
-      toStepReport({
-        now_ms: 16,
+      toFrameReport({
         active_threads: 2,
-        stepped_threads: 1,
+        tick_count: 4,
+        op_count: 100,
         emitted_effects: 3,
+        stop_reason: 'timeout',
+        should_render: true,
+        is_in_warp: false,
       }),
     ).toEqual({
-      nowMs: 16,
       activeThreads: 2,
-      steppedThreads: 1,
+      ticks: 4,
+      ops: 100,
       emittedEffects: 3,
+      stopReason: 'timeout',
+      shouldRender: true,
+      isInWarp: false,
     })
   })
 })

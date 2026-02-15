@@ -115,12 +115,15 @@ let music_project =
 ///|
 test "music extension opcodes update tempo and emit note/drum effects" {
   let vm = unwrap_result(
-    try? @moonscratch.vm_new_from_json(music_project),
+    try? vm_new_precompiled_from_json(music_project),
     "vm init failed",
   )
   @moonscratch.vm_green_flag(vm)
+  let mut now_ms = 0
   for _ in 0..<40 {
-    ignore(@moonscratch.vm_step(vm, 16))
+    now_ms += 16
+    @moonscratch.vm_set_time(vm, now_ms)
+    ignore(@moonscratch.vm_step_frame(vm))
   }
 
   let snapshot = unwrap_result(
@@ -297,7 +300,7 @@ let text2speech_translate_project =
 ///|
 test "text2speech and translate extension opcodes use JS-provided API data" {
   let vm = unwrap_result(
-    try? @moonscratch.vm_new_from_json(text2speech_translate_project),
+    try? vm_new_precompiled_from_json(text2speech_translate_project),
     "vm init failed",
   )
   @moonscratch.vm_green_flag(vm)
@@ -307,11 +310,11 @@ test "text2speech and translate extension opcodes use JS-provided API data" {
   )
 
   for _ in 0..<6 {
-    ignore(@moonscratch.vm_step(vm, 16))
+    ignore(@moonscratch.vm_step_frame(vm))
   }
   @moonscratch.vm_post_io_json(vm, "text2speech_done_1", "true")
   for _ in 0..<10 {
-    ignore(@moonscratch.vm_step(vm, 16))
+    ignore(@moonscratch.vm_step_frame(vm))
   }
 
   let snapshot = unwrap_result(
@@ -536,7 +539,7 @@ let pen_touching_assets =
 ///|
 test "pen opcodes draw into headless buffer and touching color reporters read it" {
   let vm = unwrap_result(
-    try? @moonscratch.vm_new_from_json(
+    try? vm_new_precompiled_from_json(
       pen_touching_project,
       assets_json=pen_touching_assets,
     ),
@@ -544,7 +547,7 @@ test "pen opcodes draw into headless buffer and touching color reporters read it
   )
   @moonscratch.vm_green_flag(vm)
   for _ in 0..<60 {
-    ignore(@moonscratch.vm_step(vm, 16))
+    ignore(@moonscratch.vm_step_frame(vm))
   }
 
   let snapshot = unwrap_result(
@@ -594,9 +597,9 @@ test "pen opcodes draw into headless buffer and touching color reporters read it
 }
 
 ///|
-test "render_svg outputs composited scene colors" {
+test "render_frame outputs composited scene colors" {
   let vm = unwrap_result(
-    try? @moonscratch.vm_new_from_json(
+    try? vm_new_precompiled_from_json(
       pen_touching_project,
       assets_json=pen_touching_assets,
     ),
@@ -604,14 +607,36 @@ test "render_svg outputs composited scene colors" {
   )
   @moonscratch.vm_green_flag(vm)
   for _ in 0..<60 {
-    ignore(@moonscratch.vm_step(vm, 16))
+    ignore(@moonscratch.vm_step_frame(vm))
   }
 
-  let svg = @moonscratch.vm_render_svg(vm)
-  assert_true(svg.contains("<svg"))
-  assert_true(svg.contains("shape-rendering=\"crispEdges\""))
-  assert_true(svg.contains("rgb(0,255,0)"))
-  assert_true(svg.contains("rgb(255,0,0)"))
-  assert_true(svg.contains("rgb(0,0,255)"))
-  assert_true(svg.contains("</svg>"))
+  let frame = @moonscratch.vm_render_frame(vm)
+  assert_true(frame.width > 0)
+  assert_true(frame.height > 0)
+  assert_eq(frame.width * frame.height * 4, frame.pixels.length())
+
+  let mut has_green = false
+  let mut has_red = false
+  let mut has_blue = false
+  for i in 0..<(frame.pixels.length() / 4) {
+    let base = i * 4
+    let r = frame.pixels[base].to_int()
+    let g = frame.pixels[base + 1].to_int()
+    let b = frame.pixels[base + 2].to_int()
+    let a = frame.pixels[base + 3].to_int()
+    if a > 0 {
+      if r == 0 && g >= 150 && b == 0 {
+        has_green = true
+      }
+      if r >= 150 && g == 0 && b == 0 {
+        has_red = true
+      }
+      if r == 0 && g == 0 && b >= 150 {
+        has_blue = true
+      }
+    }
+  }
+  assert_true(has_green)
+  assert_true(has_red)
+  assert_true(has_blue)
 }

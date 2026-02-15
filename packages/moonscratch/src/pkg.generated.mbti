@@ -6,21 +6,23 @@ pub fn default_vm_options() -> VmOptions
 
 pub fn vm_broadcast(Vm, String) -> Unit
 
+pub fn vm_compile_from_json(String, assets_json? : String) -> PrecompiledProject raise VmError
+
 pub fn vm_green_flag(Vm) -> Unit
 
-pub fn vm_new(ProjectBundle, VmOptions) -> Vm raise VmError
-
-pub fn vm_new_from_json(String, assets_json? : String, options_json? : String) -> Vm raise VmError
+pub fn vm_new_from_compiled(PrecompiledProject, options_json? : String) -> Vm raise VmError
 
 pub fn vm_post_io_json(Vm, String, String) -> Unit
 
-pub fn vm_render_svg(Vm) -> String
+pub fn vm_render_frame(Vm) -> RenderFrame
+
+pub fn vm_set_time(Vm, Int) -> Unit
 
 pub fn vm_snapshot_json(Vm) -> String
 
 pub fn vm_start(Vm) -> Unit
 
-pub fn vm_step(Vm, Int) -> StepReport
+pub fn vm_step_frame(Vm) -> FrameReport
 
 pub fn vm_stop_all(Vm) -> Unit
 
@@ -32,11 +34,66 @@ pub suberror VmError {
 }
 
 // Types and methods
+pub(all) struct BackdropHatStart {
+  backdrop_name : String
+  start_block : String
+}
+
+pub(all) struct BlockFastMeta {
+  next_pc : Int?
+  substack_pc : Int?
+  substack2_pc : Int?
+  variable : BlockFieldRef?
+  list : BlockFieldRef?
+}
+pub impl Eq for BlockFastMeta
+pub impl Show for BlockFastMeta
+pub impl ToJson for BlockFastMeta
+
+pub(all) struct BlockFieldRef {
+  name : String
+  id : String?
+}
+pub impl Eq for BlockFieldRef
+pub impl Show for BlockFieldRef
+pub impl ToJson for BlockFieldRef
+
+pub(all) enum BoolReporterOp {
+  CompareLt(Int, Int, Bool, CompareNumericGuard?, CompareNumericGuard?)
+  CompareGt(Int, Int, Bool, CompareNumericGuard?, CompareNumericGuard?)
+  CompareEq(Int, Int, Bool, CompareNumericGuard?, CompareNumericGuard?)
+  And
+  Or
+  Not
+}
+pub impl Eq for BoolReporterOp
+pub impl Show for BoolReporterOp
+
+pub(all) struct BoolReporterProgram {
+  numeric_programs : Array[NumericReporterProgram]
+  ops : Array[BoolReporterOp]
+}
+pub impl Eq for BoolReporterProgram
+pub impl Show for BoolReporterProgram
+
+pub(all) struct BroadcastHatStart {
+  message : String
+  start_block : String
+}
+
+pub(all) struct CompareNumericGuard {
+  owner_kind : Int
+  variable_id : String
+  slot : Int?
+}
+pub impl Eq for CompareNumericGuard
+pub impl Show for CompareNumericGuard
+
 pub(all) struct ControlFrame {
   kind : ControlFrameKind
   mut remaining : Int
-  substack : String?
-  after : String?
+  substack : Int?
+  after : Int?
 }
 pub impl Eq for ControlFrame
 pub impl Show for ControlFrame
@@ -61,6 +118,19 @@ pub(all) struct CostumeImage {
   pixels : Array[Byte]
 }
 
+pub(all) struct FrameReport {
+  active_threads : Int
+  tick_count : Int
+  op_count : Int
+  emitted_effects : Int
+  stop_reason : String
+  should_render : Bool
+  is_in_warp : Bool
+}
+pub impl Eq for FrameReport
+pub impl Show for FrameReport
+pub impl ToJson for FrameReport
+
 pub enum HostEffect {
   PlaySound(String, String)
   PlayNote(String, Int, Double, Int, Double)
@@ -78,10 +148,94 @@ pub impl Eq for HostEffect
 pub impl Show for HostEffect
 pub impl ToJson for HostEffect
 
-pub(all) struct ProcedureFrame {
-  return_pc : String?
-  params : Map[String, Json]
+pub(all) struct KeyPressedHatStart {
+  key_option : String
+  start_block : String
 }
+
+pub(all) enum NumericReporterOp {
+  PushConst(Double)
+  LoadVariable(String, String)
+  LoadVariableByRef(Int, String, Int?)
+  Add
+  Subtract
+  Multiply
+  Divide
+  Mod
+  Round
+  MathOp(String)
+  LoadXPosition
+  LoadYPosition
+  LoadDirection
+  LoadSize
+  LoadVolume
+  LoadTempo
+  LoadTimer
+  LoadMouseX
+  LoadMouseY
+  LoadControlCounter
+}
+pub impl Eq for NumericReporterOp
+pub impl Show for NumericReporterOp
+
+pub(all) struct NumericReporterProgram {
+  ops : Array[NumericReporterOp]
+}
+pub impl Eq for NumericReporterProgram
+pub impl Show for NumericReporterProgram
+
+pub(all) enum OpcodeTag {
+  Unknown
+  MotionChangeXBy
+  MotionChangeYBy
+  MotionSetY
+  PenPenDown
+  PenPenUp
+  ControlRepeat
+  ControlRepeatUntil
+  ControlIf
+  DataSetVariableTo
+  DataChangeVariableBy
+}
+pub impl Eq for OpcodeTag
+pub impl Show for OpcodeTag
+pub impl ToJson for OpcodeTag
+
+pub(all) struct PrecompiledProject {
+  targets : Array[TargetState]
+  stage_index : Int
+  assets : Map[String, Json]
+}
+
+pub(all) enum PredicateHatKind {
+  WhenGreaterThan
+  WhenTouchingObject
+}
+
+pub(all) struct PredicateHatStart {
+  kind : PredicateHatKind
+  hat_id : String
+  menu : String
+  start_block : String
+}
+
+pub(all) struct ProcedureFrame {
+  return_pc : Int?
+  control_depth : Int
+  params : Map[String, Json]
+  proccode : String
+  mut warp_mode : Bool
+}
+
+pub(all) struct ProcedureSpec {
+  start_block : String
+  param_names : Array[String]
+  param_ids : Array[String]
+  param_defaults : Array[Json]
+  warp_mode : Bool
+}
+pub impl Eq for ProcedureSpec
+pub impl Show for ProcedureSpec
 
 pub(all) struct ProjectBundle {
   project_json : String
@@ -91,12 +245,21 @@ pub impl Eq for ProjectBundle
 pub impl Show for ProjectBundle
 pub impl ToJson for ProjectBundle
 
+pub(all) struct RenderFrame {
+  width : Int
+  height : Int
+  pixels : Array[Byte]
+}
+
 pub(all) struct ScratchBlock {
   id : String
   opcode : String
+  opcode_tag : OpcodeTag
   next : String?
   parent : String?
   inputs : Map[String, Json]
+  const_number_inputs : Map[String, Double]
+  input_block_ids : Map[String, String]
   fields : Map[String, Json]
   mutation : Map[String, Json]
   top_level : Bool
@@ -104,16 +267,6 @@ pub(all) struct ScratchBlock {
 pub impl Eq for ScratchBlock
 pub impl Show for ScratchBlock
 pub impl ToJson for ScratchBlock
-
-pub(all) struct StepReport {
-  now_ms : Int
-  active_threads : Int
-  stepped_threads : Int
-  emitted_effects : Int
-}
-pub impl Eq for StepReport
-pub impl Show for StepReport
-pub impl ToJson for StepReport
 
 pub(all) struct TargetState {
   id : String
@@ -148,19 +301,47 @@ pub(all) struct TargetState {
   mut looks_effect_ghost : Double
   variables : Map[String, Json]
   variable_names : Map[String, String]
+  variable_slot_by_id : Map[String, Int]
+  variable_slot_by_name : Map[String, Int]
+  variable_id_by_slot : Array[String]
+  mut variable_values : Array[Json]
+  mut variable_numeric_flags : Array[Bool]
   lists : Map[String, Array[Json]]
   list_names : Map[String, String]
+  list_slot_by_id : Map[String, Int]
+  list_slot_by_name : Map[String, Int]
+  list_id_by_slot : Array[String]
+  mut list_values : Array[Array[Json]]
   blocks : Map[String, ScratchBlock]
+  const_number_block_values : Map[String, Double]
+  procedures : Map[String, ProcedureSpec]
+  block_pc_by_id : Map[String, Int]
+  blocks_by_pc : Array[ScratchBlock]
+  block_fast_meta_by_pc : Array[BlockFastMeta]
+  mut numeric_program_cache : Map[String, NumericReporterProgram]
+  mut numeric_program_compile_failed : Map[String, Bool]
+  mut bool_program_cache : Map[String, BoolReporterProgram]
+  mut bool_program_compile_failed : Map[String, Bool]
   top_level_hats : Array[String]
+  green_flag_starts : Array[String]
+  stage_clicked_starts : Array[String]
+  sprite_clicked_starts : Array[String]
+  clone_start_starts : Array[String]
+  key_pressed_hats : Array[KeyPressedHatStart]
+  broadcast_hats : Array[BroadcastHatStart]
+  backdrop_hats : Array[BackdropHatStart]
+  predicate_hats : Array[PredicateHatStart]
 }
 
 pub(all) struct Thread {
   id : Int
   target_index : Int
-  mut pc : String?
+  mut pc : Int?
   mut wait_until_ms : Int?
   mut wait_for_input : String?
   mut done : Bool
+  mut warp_mode : Bool
+  mut warp_started_ms : Int
   mut stack : Array[ControlFrame]
   mut loop_counters : Map[String, Int]
   parent_waiter : Int?
@@ -182,9 +363,11 @@ pub(all) struct Vm {
   mut answer : String
   mut effects : Array[HostEffect]
   mut io_state : Map[String, Json]
+  mut io_prev_state : Map[String, Json]
   mut waiting_children : Map[Int, Int]
   mut rng_state : Int
   mut control_counter : Int
+  mut hot_op_counts : Map[String, Int]
   mut next_clone_id : Int
   mut hat_predicates : Map[String, Bool]
   mut timer_start_ms : Int
@@ -192,7 +375,15 @@ pub(all) struct Vm {
   mut tts_language : String
   mut procedure_frames : Map[Int, Array[ProcedureFrame]]
   mut pending_translate_requests : Map[String, Bool]
+  mut redraw_requested : Bool
+  mut redraw_requested_while_warp : Bool
   mut current_thread_id : Int?
+  mut mathop_sin_cache_valid : Bool
+  mut mathop_sin_cache_input : Double
+  mut mathop_sin_cache_output : Double
+  mut mathop_cos_cache_valid : Bool
+  mut mathop_cos_cache_input : Double
+  mut mathop_cos_cache_output : Double
 }
 
 pub(all) struct VmOptions {
@@ -203,6 +394,7 @@ pub(all) struct VmOptions {
   mut seed : Int
   mut pen_width : Int
   mut pen_height : Int
+  mut step_timeout_ticks : Int
 }
 pub impl Eq for VmOptions
 pub impl Show for VmOptions

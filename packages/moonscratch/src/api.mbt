@@ -1,17 +1,19 @@
 ///|
-pub fn vm_new(bundle : ProjectBundle, options : VmOptions) -> Vm raise VmError {
-  vm_new_internal(bundle, options)
+pub fn vm_compile_from_json(
+  project_json : String,
+  assets_json? : String,
+) -> PrecompiledProject raise VmError {
+  let bundle = parse_bundle(project_json, assets_json)
+  compile_project(bundle)
 }
 
 ///|
-pub fn vm_new_from_json(
-  project_json : String,
-  assets_json? : String,
+pub fn vm_new_from_compiled(
+  precompiled : PrecompiledProject,
   options_json? : String,
 ) -> Vm raise VmError {
-  let bundle = parse_bundle(project_json, assets_json)
   let options = parse_options_json(options_json)
-  vm_new_internal(bundle, options)
+  vm_new_internal(precompiled, options)
 }
 
 ///|
@@ -25,8 +27,13 @@ pub fn vm_green_flag(vm : Vm) -> Unit {
 }
 
 ///|
-pub fn vm_step(vm : Vm, dt_ms : Int) -> StepReport {
-  step_runtime(vm, dt_ms)
+pub fn vm_step_frame(vm : Vm) -> FrameReport {
+  step_frame_runtime(vm)
+}
+
+///|
+pub fn vm_set_time(vm : Vm, now_ms : Int) -> Unit {
+  set_time_runtime(vm, now_ms)
 }
 
 ///|
@@ -57,6 +64,6 @@ pub fn vm_snapshot_json(vm : Vm) -> String {
 }
 
 ///|
-pub fn vm_render_svg(vm : Vm) -> String {
-  render_scene_to_svg(vm)
+pub fn vm_render_frame(vm : Vm) -> RenderFrame {
+  render_scene_to_frame(vm)
 }

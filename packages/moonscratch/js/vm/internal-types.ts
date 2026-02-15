@@ -6,13 +6,17 @@ export interface RawVMOptions {
   seed?: number
   pen_width?: number
   pen_height?: number
+  step_timeout_ticks?: number
 }
 
-export interface RawStepReport {
-  now_ms: number
+export interface RawFrameReport {
   active_threads: number
-  stepped_threads: number
+  tick_count: number
+  op_count: number
   emitted_effects: number
+  stop_reason: string
+  should_render: boolean
+  is_in_warp: boolean
 }
 
 interface MoonOk<T> {

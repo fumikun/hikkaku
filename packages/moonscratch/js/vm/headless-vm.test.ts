@@ -1,47 +1,88 @@
 import { describe, expect, test, vi } from 'vite-plus/test'
-
-import { createHeadlessVM } from './factory.ts'
+import { renderWithSVG } from '../render/index.ts'
+import { createHeadlessVM, createPrecompiledProject } from './factory.ts'
 import {
   EXAMPLE_PROJECT,
   getStageVariables,
+  INPUT_EVENT_PROJECT,
   stepMany,
   TEXT_TO_SPEECH_TRANSLATE_PROJECT,
 } from './test-projects.ts'
+import type { CreateHeadlessVMOptions, ProjectJson } from './types.ts'
 
 describe('moonscratch/js/vm/headless-vm.ts', () => {
-  test('runs project and normalizes step dt values', () => {
-    const vm = createHeadlessVM({ projectJson: EXAMPLE_PROJECT })
-    vm.greenFlag()
+  const createVm = (
+    projectJson: ProjectJson,
+    overrides: Omit<CreateHeadlessVMOptions, 'precompiled'> = {},
+  ) => {
+    const precompiled = createPrecompiledProject({ projectJson })
+    return createHeadlessVM({
+      precompiled,
+      ...overrides,
+    })
+  }
 
-    const first = vm.step(16.9)
-    const clamped = vm.step(-4)
+  test('runs project and normalizes frame values', () => {
+    const vm = createVm(EXAMPLE_PROJECT, {
+      initialNowMs: 0,
+    })
+    vm.greenFlag()
+    vm.setTime(17)
+
+    const first = vm.stepFrame()
+    const second = vm.stepFrame()
 
     expect(first).toEqual({
-      nowMs: 16,
       activeThreads: 0,
-      steppedThreads: 1,
+      ticks: 1,
+      ops: 1,
       emittedEffects: 0,
+      stopReason: 'finished',
+      shouldRender: true,
+      isInWarp: false,
     })
-    expect(clamped.nowMs).toBe(16)
-    expect(() => vm.step(Number.POSITIVE_INFINITY)).toThrow(
-      'dtMs must be a finite number',
-    )
+    expect(second.stopReason).toBe('finished')
     expect(getStageVariables(vm).var_score).toBe(42)
   })
 
-  test('renders current scene as svg', () => {
-    const vm = createHeadlessVM({ projectJson: EXAMPLE_PROJECT })
-    const svg = vm.renderSvg()
+  test('renders current scene with renderFrame and renderWithSVG', () => {
+    const vm = createVm(EXAMPLE_PROJECT)
+    const frame = vm.renderFrame()
+    const svg = renderWithSVG(frame)
 
+    expect(frame.width).toBeGreaterThan(0)
+    expect(frame.height).toBeGreaterThan(0)
+    expect(frame.pixels.length).toBe(frame.width * frame.height * 4)
     expect(svg).toContain('<svg')
     expect(svg).toContain('shape-rendering="crispEdges"')
-    expect(svg).toContain('rgb(255,255,255)')
+    expect(svg).toContain('fill="rgb(255,255,255)"')
     expect(svg).toContain('</svg>')
   })
 
+  test('detects click and key hats from input state', () => {
+    const vm = createVm(INPUT_EVENT_PROJECT, {
+      initialNowMs: 0,
+    })
+    vm.greenFlag()
+    vm.setMouseState({
+      x: 0,
+      y: 0,
+      isDown: true,
+    })
+    vm.setMouseTargets({
+      stage: true,
+      targets: ['Sprite1'],
+    })
+    vm.setKeysDown(['space'])
+    stepMany(vm, 12)
+
+    expect(getStageVariables(vm).var_stage_click).toBe(1)
+    expect(getStageVariables(vm).var_sprite_click).toBe(1)
+    expect(getStageVariables(vm).var_key).toBe(1)
+  })
+
   test('handleEffects dispatches handlers and caches translated text for next run', async () => {
-    const vm = createHeadlessVM({
-      projectJson: TEXT_TO_SPEECH_TRANSLATE_PROJECT,
+    const vm = createVm(TEXT_TO_SPEECH_TRANSLATE_PROJECT, {
       viewerLanguage: 'ja',
     })
     const translate = vi.fn(async () => 'こんにちは')

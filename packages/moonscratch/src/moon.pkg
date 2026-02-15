@@ -9,17 +9,18 @@ options(
   link: {
     "js": {
       "exports": [
-        "vm_new_from_json",
-        "vm_new",
+        "vm_compile_from_json",
+        "vm_new_from_compiled",
         "vm_start",
         "vm_green_flag",
-        "vm_step",
+        "vm_step_frame",
+        "vm_set_time",
         "vm_post_io_json",
         "vm_broadcast",
         "vm_stop_all",
         "vm_take_effects_json",
         "vm_snapshot_json",
-        "vm_render_svg",
+        "vm_render_frame",
       ],
       "format": "esm",
     },

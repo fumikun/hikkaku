@@ -1,14 +1,10 @@
 ///|
-fn repeat_frame(
-  remaining : Int,
-  substack : String?,
-  after : String?,
-) -> ControlFrame {
+fn repeat_frame(remaining : Int, substack : Int?, after : Int?) -> ControlFrame {
   { kind: ControlFrameKind::Repeat, remaining, substack, after }
 }
 
 ///|
-fn forever_frame(substack : String?, after : String?) -> ControlFrame {
+fn forever_frame(substack : Int?, after : Int?) -> ControlFrame {
   { kind: ControlFrameKind::Forever, remaining: 0, substack, after }
 }
 
@@ -100,6 +96,345 @@ fn input_or_field_string(
       None => ""
     }
   }
+}
+
+///|
+fn block_constant_number_input(
+  block : ScratchBlock,
+  input_name : String,
+) -> Double? {
+  block.const_number_inputs.get(input_name)
+}
+
+///|
+fn reporter_opcode_guaranteed_number(opcode : String) -> Bool {
+  match opcode {
+    "math_number"
+    | "math_integer"
+    | "math_whole_number"
+    | "math_positive_number"
+    | "math_angle"
+    | "operator_add"
+    | "operator_subtract"
+    | "operator_multiply"
+    | "operator_divide"
+    | "operator_mod"
+    | "operator_round"
+    | "operator_mathop"
+    | "operator_random"
+    | "motion_xposition"
+    | "motion_yposition"
+    | "motion_direction"
+    | "looks_size"
+    | "sound_volume"
+    | "sensing_timer"
+    | "sensing_mousex"
+    | "sensing_mousey"
+    | "sensing_current"
+    | "sensing_dayssince2000"
+    | "sensing_loudness"
+    | "music_getTempo"
+    | "control_get_counter" => true
+    _ => false
+  }
+}
+
+///|
+fn fast_numeric_value_for_setvariable(
+  vm : Vm,
+  target : TargetState,
+  target_index : Int,
+  block : ScratchBlock,
+) -> Double? {
+  match block.const_number_inputs.get("VALUE") {
+    Some(value) => return Some(value)
+    None => ()
+  }
+  match block_input_block_id(block, "VALUE") {
+    Some(reporter_id) =>
+      match target.blocks.get(reporter_id) {
+        Some(reporter) =>
+          if reporter_opcode_guaranteed_number(reporter.opcode) {
+            Some(number_from_input(vm, target_index, block, "VALUE", 0))
+          } else {
+            None
+          }
+        None => None
+      }
+    None => None
+  }
+}
+
+///|
+fn can_fast_numeric_value_for_setvariable(
+  target : TargetState,
+  block : ScratchBlock,
+) -> Bool {
+  if block.const_number_inputs.contains("VALUE") {
+    return true
+  }
+  match block_input_block_id(block, "VALUE") {
+    Some(reporter_id) =>
+      match target.blocks.get(reporter_id) {
+        Some(reporter) => reporter_opcode_guaranteed_number(reporter.opcode)
+        None => false
+      }
+    None => false
+  }
+}
+
+///|
+fn eval_reporter_number_or_fallback(
+  vm : Vm,
+  target_index : Int,
+  block_id : String,
+) -> Double {
+  match eval_reporter_number_block_depth(vm, target_index, block_id, 1) {
+    Some(value) => value
+    None =>
+      json_to_number_value(
+        eval_reporter_block_depth(vm, target_index, block_id, 1),
+      )
+  }
+}
+
+///|
+fn try_fast_repeat_motion_step(
+  vm : Vm,
+  target_index : Int,
+  times : Int,
+  substack_pc : Int?,
+) -> Bool {
+  if times <= 0 {
+    return true
+  }
+  if target_index < 0 || target_index >= vm.targets.length() {
+    return false
+  }
+  let target = vm.targets[target_index]
+  if target.pen_down {
+    if target.pen_transparency > 0.0 || target.pen_size != 1.0 {
+      return false
+    }
+    if target.x.floor() != target.x || target.y.floor() != target.y {
+      return false
+    }
+  }
+  match substack_pc {
+    Some(block_pc) =>
+      if block_pc >= 0 &&
+        block_pc < vm.targets[target_index].blocks_by_pc.length() {
+        let body = vm.targets[target_index].blocks_by_pc[block_pc]
+        if body.next is None {
+          match body.opcode {
+            "motion_changexby" =>
+              match block_constant_number_input(body, "DX") {
+                Some(dx) => {
+                  if target.pen_down && dx.abs() != 1.0 {
+                    return false
+                  }
+                  let total = dx * Double::from_int(times)
+                  move_target_with_pen(
+                    vm,
+                    target_index,
+                    vm.targets[target_index].x + total,
+                    vm.targets[target_index].y,
+                  )
+                  true
+                }
+                None => false
+              }
+            "motion_changeyby" =>
+              match block_constant_number_input(body, "DY") {
+                Some(dy) => {
+                  if target.pen_down && dy.abs() != 1.0 {
+                    return false
+                  }
+                  let total = dy * Double::from_int(times)
+                  move_target_with_pen(
+                    vm,
+                    target_index,
+                    vm.targets[target_index].x,
+                    vm.targets[target_index].y + total,
+                  )
+                  true
+                }
+                None => false
+              }
+            _ => false
+          }
+        } else {
+          false
+        }
+      } else {
+        false
+      }
+    None => false
+  }
+}
+
+///|
+fn try_fast_repeat_numeric_variable_loop(
+  vm : Vm,
+  target_index : Int,
+  times : Int,
+  substack_pc : Int?,
+) -> Bool {
+  if times <= 0 {
+    return true
+  }
+  if target_index < 0 || target_index >= vm.targets.length() {
+    return false
+  }
+  let target = vm.targets[target_index]
+  let start_pc = match substack_pc {
+    Some(pc) => pc
+    None => return false
+  }
+  if start_pc < 0 || start_pc >= target.blocks_by_pc.length() {
+    return false
+  }
+
+  let op_block_pcs = []
+  let op_kinds = []
+  let op_owner_indices = []
+  let op_variable_ids = []
+  let op_variable_slots = []
+  let op_value_modes = []
+  let op_value_consts = []
+  let op_value_reporters = []
+
+  let mut cursor_pc : Int? = Some(start_pc)
+  let mut traversed = 0
+  while traversed < 64 {
+    traversed += 1
+    let block_pc = match cursor_pc {
+      Some(pc) => pc
+      None => break
+    }
+    if block_pc < 0 || block_pc >= target.blocks_by_pc.length() {
+      return false
+    }
+    let block = target.blocks_by_pc[block_pc]
+    match block.opcode {
+      "data_setvariableto" =>
+        match field_value(block, "VARIABLE") {
+          Some((name, id)) =>
+            match resolve_variable_ref(vm, target_index, id, Some(name)) {
+              Some((owner_index, variable_id, variable_slot)) => {
+                if !can_fast_numeric_value_for_setvariable(target, block) {
+                  return false
+                }
+                op_block_pcs.push(block_pc)
+                op_kinds.push(0)
+                op_owner_indices.push(owner_index)
+                op_variable_ids.push(variable_id)
+                op_variable_slots.push(variable_slot)
+                match block.const_number_inputs.get("VALUE") {
+                  Some(value) => {
+                    op_value_modes.push(0)
+                    op_value_consts.push(value)
+                    op_value_reporters.push("")
+                  }
+                  None =>
+                    match block_input_block_id(block, "VALUE") {
+                      Some(reporter_id) => {
+                        op_value_modes.push(1)
+                        op_value_consts.push(0.0)
+                        op_value_reporters.push(reporter_id)
+                      }
+                      None => return false
+                    }
+                }
+              }
+              None => return false
+            }
+          None => return false
+        }
+      "data_changevariableby" =>
+        match field_value(block, "VARIABLE") {
+          Some((name, id)) =>
+            match resolve_variable_ref(vm, target_index, id, Some(name)) {
+              Some((owner_index, variable_id, variable_slot)) => {
+                op_block_pcs.push(block_pc)
+                op_kinds.push(1)
+                op_owner_indices.push(owner_index)
+                op_variable_ids.push(variable_id)
+                op_variable_slots.push(variable_slot)
+                match block.const_number_inputs.get("VALUE") {
+                  Some(value) => {
+                    op_value_modes.push(0)
+                    op_value_consts.push(value)
+                    op_value_reporters.push("")
+                  }
+                  None =>
+                    match block_input_block_id(block, "VALUE") {
+                      Some(reporter_id) => {
+                        op_value_modes.push(1)
+                        op_value_consts.push(0.0)
+                        op_value_reporters.push(reporter_id)
+                      }
+                      None => {
+                        op_value_modes.push(2)
+                        op_value_consts.push(0.0)
+                        op_value_reporters.push("")
+                      }
+                    }
+                }
+              }
+              None => return false
+            }
+          None => return false
+        }
+      _ => return false
+    }
+    cursor_pc = target_block_pc_from_id(target, block.next)
+  }
+
+  if cursor_pc is Some(_) || op_block_pcs.is_empty() {
+    return false
+  }
+
+  for _ in 0..<times {
+    for i in 0..<op_block_pcs.length() {
+      let block_pc = op_block_pcs[i]
+      let block = vm.targets[target_index].blocks_by_pc[block_pc]
+      let owner_index = op_owner_indices[i]
+      let variable_id = op_variable_ids[i]
+      let variable_slot = op_variable_slots[i]
+      let value = match op_value_modes[i] {
+        0 => op_value_consts[i]
+        1 =>
+          eval_reporter_number_or_fallback(
+            vm,
+            target_index,
+            op_value_reporters[i],
+          )
+        _ => number_from_input(vm, target_index, block, "VALUE", 0)
+      }
+      if op_kinds[i] == 0 {
+        write_variable_by_ref(
+          vm,
+          owner_index,
+          variable_id,
+          variable_slot,
+          json_number(value),
+        )
+      } else {
+        let current = json_to_number_value(
+          read_variable_by_ref(vm, owner_index, variable_id, variable_slot),
+        )
+        write_variable_by_ref(
+          vm,
+          owner_index,
+          variable_id,
+          variable_slot,
+          json_number(current + value),
+        )
+      }
+    }
+  }
+  true
 }
 
 ///|
@@ -314,9 +649,55 @@ fn clear_target_looks_effect(vm : Vm, target_index : Int) -> Unit {
 }
 
 ///|
+fn sync_thread_warp_state(vm : Vm, thread : Thread) -> Unit {
+  match vm.procedure_frames.get(thread.id) {
+    Some(stack) =>
+      if stack.is_empty() {
+        thread.warp_mode = false
+        thread.warp_started_ms = 0
+      } else {
+        let frame = stack[stack.length() - 1]
+        thread.warp_mode = frame.warp_mode
+        if thread.warp_mode && thread.warp_started_ms == 0 {
+          thread.warp_started_ms = vm.now_ms
+        } else if !thread.warp_mode {
+          thread.warp_started_ms = 0
+        }
+      }
+    None => {
+      thread.warp_mode = false
+      thread.warp_started_ms = 0
+    }
+  }
+}
+
+///|
 fn unwind_control(vm : Vm, thread : Thread) -> Thread {
   let thread = thread
   while thread.pc is None {
+    let mut should_pop_procedure_first = false
+    match vm.procedure_frames.get(thread.id) {
+      Some(proc_stack) =>
+        if !proc_stack.is_empty() {
+          let current_proc = proc_stack[proc_stack.length() - 1]
+          if thread.stack.length() <= current_proc.control_depth {
+            should_pop_procedure_first = true
+          }
+        }
+      None => ()
+    }
+
+    if should_pop_procedure_first {
+      match pop_procedure_frame(vm, thread.id) {
+        Some(frame) => {
+          thread.pc = frame.return_pc
+          sync_thread_warp_state(vm, thread)
+          continue
+        }
+        None => ()
+      }
+    }
+
     match thread.stack.pop() {
       Some(frame) =>
         match frame.kind {
@@ -341,9 +722,14 @@ fn unwind_control(vm : Vm, thread : Thread) -> Thread {
         }
       None =>
         match pop_procedure_frame(vm, thread.id) {
-          Some(frame) => thread.pc = frame.return_pc
+          Some(frame) => {
+            thread.pc = frame.return_pc
+            sync_thread_warp_state(vm, thread)
+          }
           None => {
             thread.done = true
+            thread.warp_mode = false
+            thread.warp_started_ms = 0
             return thread
           }
         }
@@ -378,14 +764,6 @@ fn block_broadcast_name(
   if from_input_text != "" {
     return from_input_text
   }
-  match field_value(block, "BROADCAST_OPTION") {
-    Some((name, _)) => name
-    None => ""
-  }
-}
-
-///|
-fn hat_broadcast_name(block : ScratchBlock) -> String {
   match field_value(block, "BROADCAST_OPTION") {
     Some((name, _)) => name
     None => ""
@@ -452,20 +830,9 @@ fn spawn_clone_start_hats(vm : Vm, target_index : Int) -> Int {
   }
 
   let mut count = 0
-  for hat_id in target.top_level_hats {
-    match target.blocks.get(hat_id) {
-      Some(hat) =>
-        if hat.opcode == "control_start_as_clone" {
-          match hat.next {
-            Some(start) => {
-              spawn_thread(vm, target_index, start, None)
-              count += 1
-            }
-            None => ()
-          }
-        }
-      None => ()
-    }
+  for start in target.clone_start_starts {
+    spawn_thread(vm, target_index, start, None)
+    count += 1
   }
   count
 }
@@ -549,8 +916,13 @@ fn point_towards_position(
   if dx == 0.0 && dy == 0.0 {
     return
   }
+  let old_direction = vm.targets[target_index].direction
   let angle = 90.0 - @math.atan2(dy, dx) * 180.0 / @math.PI
-  vm.targets[target_index].direction = normalized_scratch_direction(angle)
+  let new_direction = normalized_scratch_direction(angle)
+  vm.targets[target_index].direction = new_direction
+  if old_direction != new_direction {
+    request_redraw(vm)
+  }
 }
 
 ///|
@@ -580,7 +952,12 @@ fn apply_if_on_edge_bounce(vm : Vm, target_index : Int) -> Unit {
   if x != original_x || y != original_y {
     move_target_with_pen(vm, target_index, x, y)
   }
-  vm.targets[target_index].direction = normalized_scratch_direction(direction)
+  let old_direction = vm.targets[target_index].direction
+  let new_direction = normalized_scratch_direction(direction)
+  vm.targets[target_index].direction = new_direction
+  if old_direction != new_direction {
+    request_redraw(vm)
+  }
 }
 
 ///|
@@ -734,25 +1111,10 @@ fn spawn_hats_for_backdrop(
     if target.deleted {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whenbackdropswitchesto" {
-            let expected = match field_value(hat, "BACKDROP") {
-              Some((name, _)) => name
-              None => ""
-            }
-            if expected == backdrop_name {
-              match hat.next {
-                Some(start) => {
-                  spawn_thread(vm, target_index, start, parent_waiter)
-                  count += 1
-                }
-                None => ()
-              }
-            }
-          }
-        None => ()
+    for hat in target.backdrop_hats {
+      if hat.backdrop_name == backdrop_name {
+        spawn_thread(vm, target_index, hat.start_block, parent_waiter)
+        count += 1
       }
     }
   }
@@ -775,6 +1137,7 @@ fn set_stage_backdrop_index(
   vm.targets[stage_index].current_costume = normalized
   let after = target_costume_name(vm.targets[stage_index], normalized)
   if after != before {
+    request_redraw(vm)
     spawn_hats_for_backdrop(vm, after, parent_waiter)
   } else {
     0
@@ -805,6 +1168,24 @@ fn block_mutation_string(block : ScratchBlock, key : String) -> String? {
 }
 
 ///|
+fn block_mutation_bool(block : ScratchBlock, key : String) -> Bool {
+  match block.mutation.get(key) {
+    Some(True) => true
+    Some(False) => false
+    Some(String(value)) => {
+      let normalized = value.trim().to_lower()
+      if normalized == "true" || normalized == "1" {
+        true
+      } else {
+        false
+      }
+    }
+    Some(Number(value, ..)) => value.to_int() != 0
+    _ => false
+  }
+}
+
+///|
 fn parse_json_string_array(raw : String) -> Array[String] {
   let parsed = try? @json.parse(raw)
   match parsed {
@@ -826,50 +1207,20 @@ fn parse_json_value_array(raw : String) -> Array[Json] {
 fn find_procedure_body(
   target : TargetState,
   proccode : String,
-) -> (String, Array[String], Array[String], Array[Json])? {
-  for _, block in target.blocks {
-    if block.opcode != "procedures_definition" {
-      continue
-    }
-    match block_input_block_id(block, "custom_block") {
-      Some(proto_id) =>
-        match target.blocks.get(proto_id) {
-          Some(prototype) =>
-            if prototype.opcode == "procedures_prototype" {
-              let code = match block_mutation_string(prototype, "proccode") {
-                Some(value) => value
-                None => ""
-              }
-              if code == proccode {
-                match block.next {
-                  Some(start_block) => {
-                    let names = match
-                      block_mutation_string(prototype, "argumentnames") {
-                      Some(raw) => parse_json_string_array(raw)
-                      None => []
-                    }
-                    let ids = match
-                      block_mutation_string(prototype, "argumentids") {
-                      Some(raw) => parse_json_string_array(raw)
-                      None => []
-                    }
-                    let defaults = match
-                      block_mutation_string(prototype, "argumentdefaults") {
-                      Some(raw) => parse_json_value_array(raw)
-                      None => []
-                    }
-                    return Some((start_block, names, ids, defaults))
-                  }
-                  None => return None
-                }
-              }
-            }
-          None => ()
-        }
-      None => ()
-    }
+) -> (String, Array[String], Array[String], Array[Json], Bool)? {
+  match target.procedures.get(proccode) {
+    Some(spec) =>
+      Some(
+        (
+          spec.start_block,
+          spec.param_names.copy(),
+          spec.param_ids.copy(),
+          spec.param_defaults.copy(),
+          spec.warp_mode,
+        ),
+      )
+    None => None
   }
-  None
 }
 
 ///|
@@ -987,14 +1338,190 @@ fn parse_name_events(
 }
 
 ///|
-fn take_io_signal(vm : Vm, key : String) -> Json? {
-  match vm.io_state.get(key) {
-    Some(value) => {
-      vm.io_state.remove(key)
-      Some(value)
-    }
-    None => None
+fn parse_key_state_from_io(io_state : Map[String, Json]) -> Array[String] {
+  let out = []
+  match io_state.get("keys_down") {
+    Some(payload) =>
+      for key in parse_key_events(payload) {
+        out.push(lower_trim(key))
+      }
+    None => ()
   }
+  match io_state.get("keyboard") {
+    Some(payload) =>
+      for key in parse_key_events(payload) {
+        out.push(lower_trim(key))
+      }
+    None => ()
+  }
+  out
+}
+
+///|
+fn parse_backdrop_state_from_io(io_state : Map[String, Json]) -> Array[String] {
+  let out = []
+  match io_state.get("backdrop") {
+    Some(payload) =>
+      for name in parse_name_events(payload, "backdrop", "backdrops") {
+        out.push(name)
+      }
+    None => ()
+  }
+  out
+}
+
+///|
+fn unique_names(values : Array[String]) -> Array[String] {
+  let seen = {}
+  let out = []
+  for raw in values {
+    let value = raw.trim().to_string()
+    if value == "" || seen.get_or_default(value, false) {
+      continue
+    }
+    seen[value] = true
+    out.push(value)
+  }
+  out
+}
+
+///|
+fn newly_added_names(
+  current_values : Array[String],
+  previous_values : Array[String],
+) -> Array[String] {
+  let previous_set = {}
+  for raw in previous_values {
+    let value = raw.trim().to_string()
+    if value == "" {
+      continue
+    }
+    previous_set[value] = true
+  }
+
+  let seen = {}
+  let out = []
+  for raw in current_values {
+    let value = raw.trim().to_string()
+    if value == "" ||
+      previous_set.get_or_default(value, false) ||
+      seen.get_or_default(value, false) {
+      continue
+    }
+    seen[value] = true
+    out.push(value)
+  }
+  out
+}
+
+///|
+fn read_mouse_down_from_io_state(io_state : Map[String, Json]) -> Bool {
+  match io_state.get("mouse") {
+    Some(Object(obj)) =>
+      match obj.get("isDown") {
+        Some(value) => json_to_bool_value(value)
+        None =>
+          match obj.get("down") {
+            Some(value) => json_to_bool_value(value)
+            None => false
+          }
+      }
+    Some(value) => json_to_bool_value(value)
+    None =>
+      match io_state.get("mousedown") {
+        Some(value) => json_to_bool_value(value)
+        None => false
+      }
+  }
+}
+
+///|
+fn read_mouse_targets_from_io_state(
+  io_state : Map[String, Json],
+) -> (Bool, Array[String]) {
+  let mut stage = false
+  let targets = []
+  match io_state.get("mouse_targets") {
+    Some(True) => stage = true
+    Some(False) => ()
+    Some(payload) =>
+      match payload {
+        String(_) | Number(_, ..) =>
+          push_string_if_non_empty(targets, payload, false)
+        Array(items) =>
+          for item in items {
+            push_string_if_non_empty(targets, item, false)
+          }
+        Object(obj) => {
+          match obj.get("stage") {
+            Some(value) => stage = json_to_bool_value(value)
+            None => ()
+          }
+          match obj.get("target") {
+            Some(value) => push_string_if_non_empty(targets, value, false)
+            None => ()
+          }
+          match obj.get("targets") {
+            Some(Array(items)) =>
+              for item in items {
+                push_string_if_non_empty(targets, item, false)
+              }
+            _ => ()
+          }
+          match obj.get("sprite") {
+            Some(value) => push_string_if_non_empty(targets, value, false)
+            None => ()
+          }
+          match obj.get("sprites") {
+            Some(Array(items)) =>
+              for item in items {
+                push_string_if_non_empty(targets, item, false)
+              }
+            _ => ()
+          }
+        }
+        _ => ()
+      }
+    _ => ()
+  }
+  (stage, unique_names(targets))
+}
+
+///|
+fn has_mouse_down_rising_edge(vm : Vm) -> Bool {
+  let current = read_mouse_down_from_io_state(vm.io_state)
+  let previous = read_mouse_down_from_io_state(vm.io_prev_state)
+  current && !previous
+}
+
+///|
+fn dispatch_io_event_hats(vm : Vm) -> Int {
+  let mut count = 0
+
+  let current_keys = parse_key_state_from_io(vm.io_state)
+  let previous_keys = parse_key_state_from_io(vm.io_prev_state)
+  for key in newly_added_names(current_keys, previous_keys) {
+    count += spawn_hats_for_key(vm, key)
+  }
+
+  if has_mouse_down_rising_edge(vm) {
+    let (stage_clicked, sprite_targets) = read_mouse_targets_from_io_state(
+      vm.io_state,
+    )
+    if stage_clicked {
+      count += spawn_stage_clicked_hats(vm)
+    }
+    for name in sprite_targets {
+      count += spawn_sprite_clicked_hats(vm, name)
+    }
+  }
+
+  let current_backdrops = parse_backdrop_state_from_io(vm.io_state)
+  let previous_backdrops = parse_backdrop_state_from_io(vm.io_prev_state)
+  for name in newly_added_names(current_backdrops, previous_backdrops) {
+    count += spawn_hats_for_backdrop(vm, name, None)
+  }
+  count
 }
 
 ///|
@@ -1005,25 +1532,10 @@ fn spawn_hats_for_key(vm : Vm, key : String) -> Int {
     if target.deleted {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whenkeypressed" {
-            let option = match field_value(hat, "KEY_OPTION") {
-              Some((name, _)) => lower_trim(name)
-              None => "any"
-            }
-            if option == "any" || option == key {
-              match hat.next {
-                Some(start) => {
-                  spawn_thread(vm, target_index, start, None)
-                  count += 1
-                }
-                None => ()
-              }
-            }
-          }
-        None => ()
+    for hat in target.key_pressed_hats {
+      if hat.key_option == "any" || hat.key_option == key {
+        spawn_thread(vm, target_index, hat.start_block, None)
+        count += 1
       }
     }
   }
@@ -1042,20 +1554,9 @@ fn spawn_stage_clicked_hats(vm : Vm) -> Int {
   }
 
   let mut count = 0
-  for hat_id in stage.top_level_hats {
-    match stage.blocks.get(hat_id) {
-      Some(hat) =>
-        if hat.opcode == "event_whenstageclicked" {
-          match hat.next {
-            Some(start) => {
-              spawn_thread(vm, target_index, start, None)
-              count += 1
-            }
-            None => ()
-          }
-        }
-      None => ()
-    }
+  for start in stage.stage_clicked_starts {
+    spawn_thread(vm, target_index, start, None)
+    count += 1
   }
   count
 }
@@ -1067,20 +1568,9 @@ fn spawn_sprite_clicked_hats(vm : Vm, sprite_name : String) -> Int {
     if target.deleted || target.is_stage || target.name != sprite_name {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whenthisspriteclicked" {
-            match hat.next {
-              Some(start) => {
-                spawn_thread(vm, target_index, start, None)
-                count += 1
-              }
-              None => ()
-            }
-          }
-        None => ()
-      }
+    for start in target.sprite_clicked_starts {
+      spawn_thread(vm, target_index, start, None)
+      count += 1
     }
   }
   count
@@ -1146,35 +1636,29 @@ fn hat_predicate_value(
   vm : Vm,
   target_index : Int,
   target : TargetState,
-  hat : ScratchBlock,
+  predicate : PredicateHatStart,
 ) -> Bool {
-  if hat.opcode == "event_whengreaterthan" {
-    let threshold = json_to_number_value(
-      value_from_input(vm, target_index, hat, "VALUE", 0),
-    )
-    let menu = match field_value(hat, "WHENGREATERTHANMENU") {
-      Some((name, _)) => lower_trim(name)
-      None => ""
-    }
-    let current = if menu == "timer" {
-      Double::from_int(vm.now_ms - vm.timer_start_ms) / 1000.0
-    } else if menu == "loudness" {
-      read_loudness(vm)
-    } else {
-      0.0
-    }
-    return current > threshold
+  match target.blocks.get(predicate.hat_id) {
+    Some(hat) =>
+      match predicate.kind {
+        PredicateHatKind::WhenGreaterThan => {
+          let threshold = json_to_number_value(
+            value_from_input(vm, target_index, hat, "VALUE", 0),
+          )
+          let current = if predicate.menu == "timer" {
+            Double::from_int(vm.now_ms - vm.timer_start_ms) / 1000.0
+          } else if predicate.menu == "loudness" {
+            read_loudness(vm)
+          } else {
+            0.0
+          }
+          current > threshold
+        }
+        PredicateHatKind::WhenTouchingObject =>
+          read_touching_from_io(vm, target.name, predicate.menu)
+      }
+    None => false
   }
-
-  if hat.opcode == "event_whentouchingobject" {
-    let option = match field_value(hat, "TOUCHINGOBJECTMENU") {
-      Some((name, _)) => name
-      None => ""
-    }
-    return read_touching_from_io(vm, target.name, option)
-  }
-
-  false
 }
 
 ///|
@@ -1184,68 +1668,17 @@ fn spawn_predicate_hats(vm : Vm) -> Int {
     if target.deleted {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whengreaterthan" ||
-            hat.opcode == "event_whentouchingobject" {
-            let key = predicate_state_key(target_index, hat.id)
-            let previous = vm.hat_predicates.get_or_default(key, false)
-            let current = hat_predicate_value(vm, target_index, target, hat)
-            if current && !previous {
-              match hat.next {
-                Some(start) => {
-                  spawn_thread(vm, target_index, start, None)
-                  count += 1
-                }
-                None => ()
-              }
-            }
-            vm.hat_predicates[key] = current
-          }
-        None => ()
+    for predicate in target.predicate_hats {
+      let key = predicate_state_key(target_index, predicate.hat_id)
+      let previous = vm.hat_predicates.get_or_default(key, false)
+      let current = hat_predicate_value(vm, target_index, target, predicate)
+      if current && !previous {
+        spawn_thread(vm, target_index, predicate.start_block, None)
+        count += 1
       }
+      vm.hat_predicates[key] = current
     }
   }
-  count
-}
-
-///|
-fn dispatch_io_event_hats(vm : Vm) -> Int {
-  let mut count = 0
-
-  match take_io_signal(vm, "key_pressed") {
-    Some(payload) =>
-      for key in parse_key_events(payload) {
-        count += spawn_hats_for_key(vm, key)
-      }
-    None => ()
-  }
-
-  match take_io_signal(vm, "stage_clicked") {
-    Some(payload) =>
-      if json_to_bool_value(payload) {
-        count += spawn_stage_clicked_hats(vm)
-      }
-    None => ()
-  }
-
-  match take_io_signal(vm, "sprite_clicked") {
-    Some(payload) =>
-      for name in parse_name_events(payload, "target", "targets") {
-        count += spawn_sprite_clicked_hats(vm, name)
-      }
-    None => ()
-  }
-
-  match take_io_signal(vm, "backdrop_switched") {
-    Some(payload) =>
-      for name in parse_name_events(payload, "backdrop", "backdrops") {
-        count += spawn_hats_for_backdrop(vm, name, None)
-      }
-    None => ()
-  }
-
   count
 }
 
@@ -1260,20 +1693,10 @@ fn spawn_hats_for_message(
     if target.deleted {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whenbroadcastreceived" &&
-            hat_broadcast_name(hat) == message {
-            match hat.next {
-              Some(start) => {
-                spawn_thread(vm, target_index, start, parent_waiter)
-                count += 1
-              }
-              None => ()
-            }
-          }
-        None => ()
+    for hat in target.broadcast_hats {
+      if hat.message == message {
+        spawn_thread(vm, target_index, hat.start_block, parent_waiter)
+        count += 1
       }
     }
   }
@@ -1287,20 +1710,9 @@ fn spawn_green_flag_hats(vm : Vm) -> Int {
     if target.deleted {
       continue
     }
-    for hat_id in target.top_level_hats {
-      match target.blocks.get(hat_id) {
-        Some(hat) =>
-          if hat.opcode == "event_whenflagclicked" {
-            match hat.next {
-              Some(start) => {
-                spawn_thread(vm, target_index, start, None)
-                count += 1
-              }
-              None => ()
-            }
-          }
-        None => ()
-      }
+    for start in target.green_flag_starts {
+      spawn_thread(vm, target_index, start, None)
+      count += 1
     }
   }
   count
@@ -1315,7 +1727,6 @@ fn resolve_thread_input_wait(vm : Vm, thread : Thread) -> Thread {
           if key == "answer" {
             vm.answer = json_to_string_value(value)
           }
-          vm.io_state.remove(key)
           thread.wait_for_input = None
         }
         None => ()
@@ -1342,6 +1753,86 @@ fn is_thread_blocked(vm : Vm, thread : Thread) -> Bool {
 }
 
 ///|
+fn is_warp_window_active(vm : Vm, thread : Thread) -> Bool {
+  ignore(vm)
+  thread.warp_mode
+}
+
+///|
+fn has_active_warp_thread(vm : Vm) -> Bool {
+  for thread in vm.threads {
+    if thread.done {
+      continue
+    }
+    if thread.warp_mode {
+      return true
+    }
+    match vm.procedure_frames.get(thread.id) {
+      Some(frames) =>
+        for frame in frames {
+          if frame.warp_mode {
+            return true
+          }
+        }
+      None => ()
+    }
+  }
+  false
+}
+
+///|
+fn is_current_thread_in_warp_context(vm : Vm) -> Bool {
+  match vm.current_thread_id {
+    Some(thread_id) => {
+      for thread in vm.threads {
+        if thread.id == thread_id {
+          if thread.warp_mode {
+            return true
+          }
+          break
+        }
+      }
+      match vm.procedure_frames.get(thread_id) {
+        Some(frames) =>
+          for frame in frames {
+            if frame.warp_mode {
+              return true
+            }
+          }
+        None => ()
+      }
+      false
+    }
+    None => false
+  }
+}
+
+///|
+fn request_redraw(vm : Vm) -> Unit {
+  vm.redraw_requested = true
+  if is_current_thread_in_warp_context(vm) {
+    vm.redraw_requested_while_warp = true
+  }
+}
+
+///|
+fn target_block_pc_from_id(target : TargetState, block_id : String?) -> Int? {
+  match block_id {
+    Some(id) => target.block_pc_by_id.get(id)
+    None => None
+  }
+}
+
+///|
+fn target_block_from_pc(target : TargetState, block_pc : Int) -> ScratchBlock? {
+  if block_pc < 0 || block_pc >= target.blocks_by_pc.length() {
+    None
+  } else {
+    Some(target.blocks_by_pc[block_pc])
+  }
+}
+
+///|
 fn execute_list_delete(
   vm : Vm,
   target_index : Int,
@@ -1350,8 +1841,8 @@ fn execute_list_delete(
   match field_value(block, "LIST") {
     Some((list_name, list_id)) =>
       match with_list_mut(vm, target_index, list_id, Some(list_name)) {
-        Some((owner, id)) => {
-          let list = vm.targets[owner].lists.get_or_default(id, [])
+        Some((owner, id, slot)) => {
+          let list = read_list_by_ref(vm, owner, id, slot)
           let index_value = value_from_input(
             vm, target_index, block, "INDEX", 0,
           )
@@ -1368,7 +1859,7 @@ fn execute_list_delete(
               None => ()
             }
           }
-          vm.targets[owner].lists[id] = list
+          write_list_by_ref(vm, owner, id, slot, list)
         }
         None => ()
       }
@@ -1385,8 +1876,8 @@ fn execute_list_insert(
   match field_value(block, "LIST") {
     Some((list_name, list_id)) =>
       match with_list_mut(vm, target_index, list_id, Some(list_name)) {
-        Some((owner, id)) => {
-          let list = vm.targets[owner].lists.get_or_default(id, [])
+        Some((owner, id, slot)) => {
+          let list = read_list_by_ref(vm, owner, id, slot)
           let item = value_from_input(vm, target_index, block, "ITEM", 0)
           let index_value = value_from_input(
             vm, target_index, block, "INDEX", 0,
@@ -1405,7 +1896,7 @@ fn execute_list_insert(
             n.clamp(min=0, max=list.length())
           }
           list.insert(idx, item)
-          vm.targets[owner].lists[id] = list
+          write_list_by_ref(vm, owner, id, slot, list)
         }
         None => ()
       }
@@ -1422,8 +1913,8 @@ fn execute_list_replace(
   match field_value(block, "LIST") {
     Some((list_name, list_id)) =>
       match with_list_mut(vm, target_index, list_id, Some(list_name)) {
-        Some((owner, id)) => {
-          let list = vm.targets[owner].lists.get_or_default(id, [])
+        Some((owner, id, slot)) => {
+          let list = read_list_by_ref(vm, owner, id, slot)
           let item = value_from_input(vm, target_index, block, "ITEM", 0)
           let index_value = value_from_input(
             vm, target_index, block, "INDEX", 0,
@@ -1436,12 +1927,24 @@ fn execute_list_replace(
               }
             None => ()
           }
-          vm.targets[owner].lists[id] = list
+          write_list_by_ref(vm, owner, id, slot, list)
         }
         None => ()
       }
     None => ()
   }
+}
+
+///|
+fn increment_block_hot_count(
+  vm : Vm,
+  target_index : Int,
+  block_id : String,
+) -> Int {
+  let block_hot_key = "\{target_index}:\{block_id}"
+  let block_hot_count = vm.hot_op_counts.get_or_default(block_hot_key, 0) + 1
+  vm.hot_op_counts[block_hot_key] = block_hot_count
+  block_hot_count
 }
 
 ///|
@@ -1470,8 +1973,8 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
     return thread
   }
 
-  let block_id = match thread.pc {
-    Some(id) => id
+  let block_pc = match thread.pc {
+    Some(pc) => pc
     None => {
       thread.done = true
       return thread
@@ -1488,17 +1991,233 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
     return thread
   }
   let target = vm.targets[target_index]
-  let block = match target.blocks.get(block_id) {
+  let block = match target_block_from_pc(target, block_pc) {
     Some(value) => value
     None => {
       thread.pc = None
       return unwind_control(vm, thread)
     }
   }
-
-  let mut next_pc = block.next
+  let block_meta = target.block_fast_meta_by_pc[block_pc]
+  let mut next_pc = block_meta.next_pc
+  let mut handled_hot_opcode = false
 
   vm.current_thread_id = Some(thread.id)
+  match block.opcode_tag {
+    OpcodeTag::MotionChangeXBy => {
+      let value = number_from_input(vm, target_index, block, "DX", 0)
+      move_target_with_pen(
+        vm,
+        target_index,
+        vm.targets[target_index].x + value,
+        vm.targets[target_index].y,
+      )
+      handled_hot_opcode = true
+    }
+    OpcodeTag::MotionChangeYBy => {
+      let value = number_from_input(vm, target_index, block, "DY", 0)
+      move_target_with_pen(
+        vm,
+        target_index,
+        vm.targets[target_index].x,
+        vm.targets[target_index].y + value,
+      )
+      handled_hot_opcode = true
+    }
+    OpcodeTag::MotionSetY => {
+      move_target_with_pen(
+        vm,
+        target_index,
+        vm.targets[target_index].x,
+        number_from_input(vm, target_index, block, "Y", 0),
+      )
+      handled_hot_opcode = true
+    }
+    OpcodeTag::PenPenDown => {
+      vm.targets[target_index].pen_down = true
+      render_draw_pen_point(vm, target_index)
+      request_redraw(vm)
+      handled_hot_opcode = true
+    }
+    OpcodeTag::PenPenUp => {
+      vm.targets[target_index].pen_down = false
+      handled_hot_opcode = true
+    }
+    OpcodeTag::ControlRepeat => {
+      let block_hot_count = increment_block_hot_count(
+        vm,
+        target_index,
+        block.id,
+      )
+      let times = json_to_number_value(
+          value_from_input(vm, target_index, block, "TIMES", 0),
+        )
+        .floor()
+        .to_int()
+      if times > 0 {
+        let substack_pc = block_meta.substack_pc
+        let use_fast_path = times >= 32 || block_hot_count >= 8
+        if use_fast_path &&
+          try_fast_repeat_numeric_variable_loop(
+            vm, target_index, times, substack_pc,
+          ) {
+          next_pc = block_meta.next_pc
+        } else if use_fast_path &&
+          try_fast_repeat_motion_step(vm, target_index, times, substack_pc) {
+          next_pc = block_meta.next_pc
+        } else {
+          thread.stack.push(
+            repeat_frame(times, substack_pc, block_meta.next_pc),
+          )
+          next_pc = substack_pc
+        }
+      }
+      handled_hot_opcode = true
+    }
+    OpcodeTag::ControlRepeatUntil => {
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
+      if !condition {
+        thread.stack.push(
+          repeat_frame(1, block_meta.substack_pc, Some(block_pc)),
+        )
+        next_pc = block_meta.substack_pc
+      }
+      handled_hot_opcode = true
+    }
+    OpcodeTag::ControlIf => {
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
+      if condition {
+        thread.stack.push(
+          repeat_frame(1, block_meta.substack_pc, block_meta.next_pc),
+        )
+        next_pc = block_meta.substack_pc
+      }
+      handled_hot_opcode = true
+    }
+    OpcodeTag::DataSetVariableTo => {
+      match block_meta.variable {
+        Some(variable_ref) => {
+          let resolved = match variable_ref.id {
+            Some(variable_id) =>
+              resolve_variable_ref_by_id(vm, target_index, variable_id)
+            None =>
+              resolve_variable_ref(
+                vm,
+                target_index,
+                None,
+                Some(variable_ref.name),
+              )
+          }
+          match
+            fast_numeric_value_for_setvariable(vm, target, target_index, block) {
+            Some(value) =>
+              match resolved {
+                Some((owner_index, variable_id, variable_slot)) =>
+                  write_variable_by_ref(
+                    vm,
+                    owner_index,
+                    variable_id,
+                    variable_slot,
+                    json_number(value),
+                  )
+                None =>
+                  write_variable(
+                    vm,
+                    target_index,
+                    variable_ref.id,
+                    Some(variable_ref.name),
+                    json_number(value),
+                  )
+              }
+            None => {
+              let value = value_from_input(vm, target_index, block, "VALUE", 0)
+              match resolved {
+                Some((owner_index, variable_id, variable_slot)) =>
+                  write_variable_by_ref(
+                    vm, owner_index, variable_id, variable_slot, value,
+                  )
+                None =>
+                  write_variable(
+                    vm,
+                    target_index,
+                    variable_ref.id,
+                    Some(variable_ref.name),
+                    value,
+                  )
+              }
+            }
+          }
+        }
+        None => ()
+      }
+      handled_hot_opcode = true
+    }
+    OpcodeTag::DataChangeVariableBy => {
+      match block_meta.variable {
+        Some(variable_ref) => {
+          let delta = number_from_input(vm, target_index, block, "VALUE", 0)
+          let resolved = match variable_ref.id {
+            Some(variable_id) =>
+              resolve_variable_ref_by_id(vm, target_index, variable_id)
+            None =>
+              resolve_variable_ref(
+                vm,
+                target_index,
+                None,
+                Some(variable_ref.name),
+              )
+          }
+          match resolved {
+            Some((owner_index, variable_id, variable_slot)) => {
+              let current = json_to_number_value(
+                read_variable_by_ref(
+                  vm, owner_index, variable_id, variable_slot,
+                ),
+              )
+              write_variable_by_ref(
+                vm,
+                owner_index,
+                variable_id,
+                variable_slot,
+                json_number(current + delta),
+              )
+            }
+            None => {
+              let current = json_to_number_value(
+                read_variable(
+                  vm,
+                  target_index,
+                  variable_ref.id,
+                  Some(variable_ref.name),
+                ),
+              )
+              write_variable(
+                vm,
+                target_index,
+                variable_ref.id,
+                Some(variable_ref.name),
+                json_number(current + delta),
+              )
+            }
+          }
+        }
+        None => ()
+      }
+      handled_hot_opcode = true
+    }
+    OpcodeTag::Unknown => ()
+  }
+  if handled_hot_opcode {
+    vm.current_thread_id = None
+    if thread.done {
+      return thread
+    }
+    thread.pc = next_pc
+    if thread.pc is None {
+      return unwind_control(vm, thread)
+    }
+    return thread
+  }
   match block.opcode {
     "motion_movesteps" => {
       let steps = json_to_number_value(
@@ -1515,23 +2234,36 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       )
     }
     "motion_turnright" => {
+      let old_direction = vm.targets[target_index].direction
       let degrees = json_to_number_value(
         value_from_input(vm, target_index, block, "DEGREES", 0),
       )
       vm.targets[target_index].direction += degrees
+      if old_direction != vm.targets[target_index].direction {
+        request_redraw(vm)
+      }
     }
     "motion_turnleft" => {
+      let old_direction = vm.targets[target_index].direction
       let degrees = json_to_number_value(
         value_from_input(vm, target_index, block, "DEGREES", 0),
       )
       vm.targets[target_index].direction -= degrees
+      if old_direction != vm.targets[target_index].direction {
+        request_redraw(vm)
+      }
     }
-    "motion_pointindirection" =>
+    "motion_pointindirection" => {
+      let old_direction = vm.targets[target_index].direction
       vm.targets[target_index].direction = normalized_scratch_direction(
         json_to_number_value(
           value_from_input(vm, target_index, block, "DIRECTION", 0),
         ),
       )
+      if old_direction != vm.targets[target_index].direction {
+        request_redraw(vm)
+      }
+    }
     "motion_pointtowards" => {
       let menu_value = json_to_string_value(
         value_from_input(vm, target_index, block, "TOWARDS", 0),
@@ -1542,9 +2274,7 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       }
     }
     "motion_changexby" => {
-      let value = json_to_number_value(
-        value_from_input(vm, target_index, block, "DX", 0),
-      )
+      let value = number_from_input(vm, target_index, block, "DX", 0)
       move_target_with_pen(
         vm,
         target_index,
@@ -1553,9 +2283,7 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       )
     }
     "motion_changeyby" => {
-      let value = json_to_number_value(
-        value_from_input(vm, target_index, block, "DY", 0),
-      )
+      let value = number_from_input(vm, target_index, block, "DY", 0)
       move_target_with_pen(
         vm,
         target_index,
@@ -1567,7 +2295,7 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       move_target_with_pen(
         vm,
         target_index,
-        json_to_number_value(value_from_input(vm, target_index, block, "X", 0)),
+        number_from_input(vm, target_index, block, "X", 0),
         vm.targets[target_index].y,
       )
     "motion_sety" =>
@@ -1575,14 +2303,14 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         vm,
         target_index,
         vm.targets[target_index].x,
-        json_to_number_value(value_from_input(vm, target_index, block, "Y", 0)),
+        number_from_input(vm, target_index, block, "Y", 0),
       )
     "motion_gotoxy" =>
       move_target_with_pen(
         vm,
         target_index,
-        json_to_number_value(value_from_input(vm, target_index, block, "X", 0)),
-        json_to_number_value(value_from_input(vm, target_index, block, "Y", 0)),
+        number_from_input(vm, target_index, block, "X", 0),
+        number_from_input(vm, target_index, block, "Y", 0),
       )
     "motion_goto" => {
       let menu_value = json_to_string_value(
@@ -1625,15 +2353,36 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
     | "motion_align_scene"
     | "motion_scroll_right"
     | "motion_scroll_up" => ()
-    "looks_show" => vm.targets[target_index].visible = true
-    "looks_hide" => vm.targets[target_index].visible = false
-    "looks_hideallsprites" =>
+    "looks_show" => {
+      let was_visible = vm.targets[target_index].visible
+      vm.targets[target_index].visible = true
+      if !was_visible {
+        request_redraw(vm)
+      }
+    }
+    "looks_hide" => {
+      let was_visible = vm.targets[target_index].visible
+      vm.targets[target_index].visible = false
+      if was_visible {
+        request_redraw(vm)
+      }
+    }
+    "looks_hideallsprites" => {
+      let mut changed = false
       for i, candidate in vm.targets {
         if !candidate.deleted && !candidate.is_stage {
+          if vm.targets[i].visible {
+            changed = true
+          }
           vm.targets[i].visible = false
         }
       }
+      if changed {
+        request_redraw(vm)
+      }
+    }
     "looks_switchcostumeto" => {
+      let before = vm.targets[target_index].current_costume
       let input_value = value_from_input(vm, target_index, block, "COSTUME", 0)
       let resolved = match
         resolve_target_costume_index(vm, target_index, input_value, false) {
@@ -1654,13 +2403,20 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         Some(index) => vm.targets[target_index].current_costume = index
         None => ()
       }
+      if before != vm.targets[target_index].current_costume {
+        request_redraw(vm)
+      }
     }
     "looks_nextcostume" => {
       let target = vm.targets[target_index]
+      let before = target.current_costume
       vm.targets[target_index].current_costume = normalized_target_costume_index(
         target,
         target.current_costume + 1,
       )
+      if before != vm.targets[target_index].current_costume {
+        request_redraw(vm)
+      }
     }
     "looks_switchbackdropto" => {
       let value = block_backdrop_value(vm, target_index, block)
@@ -1686,6 +2442,7 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         value_from_input(vm, target_index, block, "CHANGE", 0),
       )
       set_target_looks_effect(vm, target_index, effect, amount, true)
+      request_redraw(vm)
     }
     "looks_seteffectto" => {
       let effect = input_or_field_string(
@@ -1695,8 +2452,12 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         value_from_input(vm, target_index, block, "VALUE", 0),
       )
       set_target_looks_effect(vm, target_index, effect, amount, false)
+      request_redraw(vm)
     }
-    "looks_cleargraphiceffects" => clear_target_looks_effect(vm, target_index)
+    "looks_cleargraphiceffects" => {
+      clear_target_looks_effect(vm, target_index)
+      request_redraw(vm)
+    }
     "looks_changestretchby"
     | "looks_setstretchto"
     | "looks_gotofrontback"
@@ -1706,24 +2467,28 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         value_from_input(vm, target_index, block, "CHANGE", 0),
       )
       vm.targets[target_index].size += delta
+      request_redraw(vm)
     }
     "looks_setsizeto" => {
       let size = json_to_number_value(
         value_from_input(vm, target_index, block, "SIZE", 0),
       )
       vm.targets[target_index].size = size
+      request_redraw(vm)
     }
     "looks_say" => {
       let message = json_to_string_value(
         value_from_input(vm, target_index, block, "MESSAGE", 0),
       )
       push_effect(vm, HostEffect::Say(vm.targets[target_index].name, message))
+      request_redraw(vm)
     }
     "looks_think" => {
       let message = json_to_string_value(
         value_from_input(vm, target_index, block, "MESSAGE", 0),
       )
       push_effect(vm, HostEffect::Think(vm.targets[target_index].name, message))
+      request_redraw(vm)
     }
     "looks_sayforsecs" => {
       let message = json_to_string_value(
@@ -1735,6 +2500,7 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       push_effect(vm, HostEffect::Say(vm.targets[target_index].name, message))
       let duration = if seconds < 0.0 { 0.0 } else { seconds }
       thread.wait_until_ms = Some(vm.now_ms + (duration * 1000.0).to_int())
+      request_redraw(vm)
     }
     "looks_thinkforsecs" => {
       let message = json_to_string_value(
@@ -1746,29 +2512,24 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       push_effect(vm, HostEffect::Think(vm.targets[target_index].name, message))
       let duration = if seconds < 0.0 { 0.0 } else { seconds }
       thread.wait_until_ms = Some(vm.now_ms + (duration * 1000.0).to_int())
+      request_redraw(vm)
     }
-    "pen_clear" => vm_clear_pen_pixels(vm)
+    "pen_clear" => {
+      vm_clear_pen_pixels(vm)
+      request_redraw(vm)
+    }
     "pen_stamp" =>
       if target_index >= 0 &&
         target_index < vm.targets.length() &&
         !vm.targets[target_index].is_stage &&
         !vm.targets[target_index].deleted {
-        for py in 0..<vm.pen_height {
-          for px in 0..<vm.pen_width {
-            let (stage_x, stage_y) = render_pixel_to_stage(vm, px, py)
-            match
-              render_sample_sprite_at(
-                vm, target_index, stage_x, stage_y, true, false,
-              ) {
-              Some(color) => render_blend_pen_pixel(vm, px, py, color)
-              None => ()
-            }
-          }
-        }
+        render_stamp_sprite_to_pen(vm, target_index)
+        request_redraw(vm)
       }
     "pen_penDown" => {
       vm.targets[target_index].pen_down = true
       render_draw_pen_point(vm, target_index)
+      request_redraw(vm)
     }
     "pen_penUp" => vm.targets[target_index].pen_down = false
     "pen_setPenColorToColor" => {
@@ -2029,18 +2790,28 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
     "sound_seteffectto" | "sound_changeeffectby" | "sound_cleareffects" => ()
     "data_setvariableto" =>
       match field_value(block, "VARIABLE") {
-        Some((name, id)) => {
-          let value = value_from_input(vm, target_index, block, "VALUE", 0)
-          write_variable(vm, target_index, id, Some(name), value)
-        }
+        Some((name, id)) =>
+          match
+            fast_numeric_value_for_setvariable(vm, target, target_index, block) {
+            Some(value) =>
+              write_variable(
+                vm,
+                target_index,
+                id,
+                Some(name),
+                json_number(value),
+              )
+            None => {
+              let value = value_from_input(vm, target_index, block, "VALUE", 0)
+              write_variable(vm, target_index, id, Some(name), value)
+            }
+          }
         None => ()
       }
     "data_changevariableby" =>
       match field_value(block, "VARIABLE") {
         Some((name, id)) => {
-          let delta = json_to_number_value(
-            value_from_input(vm, target_index, block, "VALUE", 0),
-          )
+          let delta = number_from_input(vm, target_index, block, "VALUE", 0)
           let current = json_to_number_value(
             read_variable(vm, target_index, id, Some(name)),
           )
@@ -2058,10 +2829,10 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       match field_value(block, "LIST") {
         Some((list_name, list_id)) =>
           match with_list_mut(vm, target_index, list_id, Some(list_name)) {
-            Some((owner, id)) => {
-              let list = vm.targets[owner].lists.get_or_default(id, [])
+            Some((owner, id, slot)) => {
+              let list = read_list_by_ref(vm, owner, id, slot)
               list.push(value_from_input(vm, target_index, block, "ITEM", 0))
-              vm.targets[owner].lists[id] = list
+              write_list_by_ref(vm, owner, id, slot, list)
             }
             None => ()
           }
@@ -2072,7 +2843,8 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       match field_value(block, "LIST") {
         Some((list_name, list_id)) =>
           match with_list_mut(vm, target_index, list_id, Some(list_name)) {
-            Some((owner, id)) => vm.targets[owner].lists[id] = []
+            Some((owner, id, slot)) =>
+              write_list_by_ref(vm, owner, id, slot, [])
             None => ()
           }
         None => ()
@@ -2089,50 +2861,60 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       )
       let duration = if duration_raw < 0.0 { 0.0 } else { duration_raw }
       thread.wait_until_ms = Some(vm.now_ms + (duration * 1000.0).to_int())
+      request_redraw(vm)
     }
     "control_wait_until" => {
-      let condition = json_to_bool_value(
-        value_from_input(vm, target_index, block, "CONDITION", 0),
-      )
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
       if !condition {
-        next_pc = Some(block.id)
+        next_pc = Some(block_pc)
       }
     }
     "control_repeat" => {
+      let block_hot_count = increment_block_hot_count(
+        vm,
+        target_index,
+        block.id,
+      )
       let times = json_to_number_value(
           value_from_input(vm, target_index, block, "TIMES", 0),
         )
         .floor()
         .to_int()
       if times > 0 {
-        let substack = block_input_block_id(block, "SUBSTACK")
-        thread.stack.push(repeat_frame(times, substack, block.next))
-        next_pc = substack
+        let substack_pc = block_meta.substack_pc
+        let use_fast_path = times >= 32 || block_hot_count >= 8
+        if use_fast_path &&
+          try_fast_repeat_motion_step(vm, target_index, times, substack_pc) {
+          next_pc = block_meta.next_pc
+        } else {
+          thread.stack.push(
+            repeat_frame(times, substack_pc, block_meta.next_pc),
+          )
+          next_pc = substack_pc
+        }
       }
     }
     "control_repeat_until" => {
-      let condition = json_to_bool_value(
-        value_from_input(vm, target_index, block, "CONDITION", 0),
-      )
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
       if !condition {
-        let substack = block_input_block_id(block, "SUBSTACK")
-        thread.stack.push(repeat_frame(1, substack, Some(block.id)))
-        next_pc = substack
+        thread.stack.push(
+          repeat_frame(1, block_meta.substack_pc, Some(block_pc)),
+        )
+        next_pc = block_meta.substack_pc
       }
     }
     "control_while" => {
-      let condition = json_to_bool_value(
-        value_from_input(vm, target_index, block, "CONDITION", 0),
-      )
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
       if condition {
-        let substack = block_input_block_id(block, "SUBSTACK")
-        thread.stack.push(repeat_frame(1, substack, Some(block.id)))
-        next_pc = substack
+        thread.stack.push(
+          repeat_frame(1, block_meta.substack_pc, Some(block_pc)),
+        )
+        next_pc = block_meta.substack_pc
       }
     }
     "control_for_each" =>
-      match field_value(block, "VARIABLE") {
-        Some((name, id)) => {
+      match block_meta.variable {
+        Some(variable_ref) => {
           let limit = json_to_number_value(
             value_from_input(vm, target_index, block, "VALUE", 0),
           )
@@ -2144,13 +2926,14 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
             write_variable(
               vm,
               target_index,
-              id,
-              Some(name),
+              variable_ref.id,
+              Some(variable_ref.name),
               json_number(Double::from_int(next_index)),
             )
-            let substack = block_input_block_id(block, "SUBSTACK")
-            thread.stack.push(repeat_frame(1, substack, Some(block.id)))
-            next_pc = substack
+            thread.stack.push(
+              repeat_frame(1, block_meta.substack_pc, Some(block_pc)),
+            )
+            next_pc = block_meta.substack_pc
           } else {
             thread.loop_counters.remove(key)
           }
@@ -2158,36 +2941,33 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
         None => ()
       }
     "control_forever" => {
-      let substack = block_input_block_id(block, "SUBSTACK")
-      thread.stack.push(forever_frame(substack, Some(block.id)))
-      next_pc = substack
+      thread.stack.push(forever_frame(block_meta.substack_pc, Some(block_pc)))
+      next_pc = block_meta.substack_pc
     }
     "control_if" => {
-      let condition = json_to_bool_value(
-        value_from_input(vm, target_index, block, "CONDITION", 0),
-      )
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
       if condition {
-        let substack = block_input_block_id(block, "SUBSTACK")
-        thread.stack.push(repeat_frame(1, substack, block.next))
-        next_pc = substack
+        thread.stack.push(
+          repeat_frame(1, block_meta.substack_pc, block_meta.next_pc),
+        )
+        next_pc = block_meta.substack_pc
       }
     }
     "control_if_else" => {
-      let condition = json_to_bool_value(
-        value_from_input(vm, target_index, block, "CONDITION", 0),
-      )
-      let branch = if condition {
-        block_input_block_id(block, "SUBSTACK")
+      let condition = bool_from_input(vm, target_index, block, "CONDITION", 0)
+      let branch_pc = if condition {
+        block_meta.substack_pc
       } else {
-        block_input_block_id(block, "SUBSTACK2")
+        block_meta.substack2_pc
       }
-      thread.stack.push(repeat_frame(1, branch, block.next))
-      next_pc = branch
+      thread.stack.push(repeat_frame(1, branch_pc, block_meta.next_pc))
+      next_pc = branch_pc
     }
     "control_all_at_once" => {
-      let substack = block_input_block_id(block, "SUBSTACK")
-      thread.stack.push(repeat_frame(1, substack, block.next))
-      next_pc = substack
+      thread.stack.push(
+        repeat_frame(1, block_meta.substack_pc, block_meta.next_pc),
+      )
+      next_pc = block_meta.substack_pc
     }
     "control_stop" => {
       let option = json_to_string_value(
@@ -2236,7 +3016,15 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
       }
       if proccode != "" {
         match find_procedure_body(target, proccode) {
-          Some((start_block, param_names, param_ids, param_defaults)) => {
+          Some(
+            (
+              start_block,
+              param_names,
+              param_ids,
+              param_defaults,
+              procedure_warp_mode,
+            )
+          ) => {
             let params = {}
             for i, param_id in param_ids {
               let name = if i < param_names.length() {
@@ -2256,11 +3044,24 @@ fn execute_thread_once(vm : Vm, thread : Thread) -> Thread {
               }
               params[name] = value
             }
+            let next_warp_mode = thread.warp_mode || procedure_warp_mode
+            if next_warp_mode && thread.warp_started_ms == 0 {
+              thread.warp_started_ms = vm.now_ms
+            } else if !next_warp_mode {
+              thread.warp_started_ms = 0
+            }
+            thread.warp_mode = next_warp_mode
+            if next_warp_mode {
+              vm.redraw_requested_while_warp = true
+            }
             push_procedure_frame(vm, thread.id, {
-              return_pc: block.next,
+              return_pc: target_block_pc_from_id(target, block.next),
+              control_depth: thread.stack.length(),
               params,
+              proccode,
+              warp_mode: next_warp_mode,
             })
-            next_pc = Some(start_block)
+            next_pc = target.block_pc_by_id.get(start_block)
           }
           None => ()
         }
@@ -2346,10 +3147,14 @@ fn green_flag_runtime(vm : Vm) -> Unit {
     }
   }
   vm.hat_predicates.clear()
+  vm.hot_op_counts.clear()
   vm.pending_translate_requests.clear()
+  vm.io_prev_state = copy_json_map(vm.io_state)
   vm.answer = ""
   vm.timer_start_ms = vm.now_ms
   vm.run_id += 1
+  vm.redraw_requested = false
+  vm.redraw_requested_while_warp = false
   vm.running = true
   let spawned = spawn_green_flag_hats(vm)
   if spawned == 0 {
@@ -2388,40 +3193,186 @@ fn post_io_json_runtime(
 }
 
 ///|
-fn step_runtime(vm : Vm, dt_ms : Int) -> StepReport {
-  if dt_ms > 0 {
-    vm.now_ms += dt_ms
-  }
+fn set_time_runtime(vm : Vm, now_ms : Int) -> Unit {
+  vm.now_ms = now_ms
+}
 
+///|
+fn step_frame_runtime(vm : Vm) -> FrameReport {
   let spawned_io = dispatch_io_event_hats(vm)
   let spawned_predicates = spawn_predicate_hats(vm)
   if spawned_io > 0 || spawned_predicates > 0 {
     vm.running = true
   }
 
-  let mut stepped = 0
+  let mut total_ticks = 0
+  let mut total_ops = 0
+  let mut stop_reason = "timeout"
+  let mut should_render = false
+  let tick_timeout = if vm.options.step_timeout_ticks > 0 {
+    vm.options.step_timeout_ticks
+  } else {
+    2048
+  }
+
   if vm.running {
-    let budget = current_step_budget(vm)
-    let mut index = 0
-    while index < vm.threads.length() && stepped < budget {
-      let thread = vm.threads[index]
-      let updated = execute_thread_once(vm, thread)
-      vm.threads[index] = updated
-      if !is_thread_blocked(vm, updated) && !updated.done {
-        stepped += 1
-      } else if updated.done {
-        stepped += 1
+    let mut saw_warp_context = has_active_warp_thread(vm) ||
+      vm.redraw_requested_while_warp
+    while total_ticks < tick_timeout {
+      let thread_count = vm.threads.length()
+      if thread_count <= 0 {
+        stop_reason = "finished"
+        should_render = true
+        break
       }
-      index += 1
+
+      let mut progressed = false
+      let mut warp_active_in_tick = false
+      let mut warp_exit_detected = false
+      let budget = current_step_budget(vm)
+      let warp_window_extra_steps = budget * 8
+      let non_warp_extra_steps = if vm.options.turbo {
+        budget
+      } else {
+        budget / 4
+      }
+
+      for index in 0..<thread_count {
+        let thread = vm.threads[index]
+        if thread.done {
+          continue
+        }
+
+        let mut updated = execute_thread_once(vm, thread)
+        let mut warp_steps = warp_window_extra_steps
+        let mut non_warp_steps = non_warp_extra_steps
+        let mut thread_saw_warp_context = false
+        while true {
+          vm.threads[index] = updated
+          let in_warp_window = is_warp_window_active(vm, updated)
+          if in_warp_window {
+            thread_saw_warp_context = true
+            warp_active_in_tick = true
+          } else if thread_saw_warp_context && !has_active_warp_thread(vm) {
+            stop_reason = "warp-exit"
+            should_render = true
+            vm.redraw_requested = false
+            vm.redraw_requested_while_warp = false
+            warp_exit_detected = true
+            break
+          }
+          let is_blocked = is_thread_blocked(vm, updated)
+          if !is_blocked && !updated.done {
+            total_ops += 1
+            progressed = true
+            if in_warp_window && warp_steps > 0 {
+              warp_steps -= 1
+              updated = execute_thread_once(vm, updated)
+              continue
+            }
+            if !in_warp_window && non_warp_steps > 0 {
+              non_warp_steps -= 1
+              updated = execute_thread_once(vm, updated)
+              continue
+            }
+          } else if updated.done {
+            total_ops += 1
+            progressed = true
+          }
+          break
+        }
+        if warp_exit_detected {
+          break
+        }
+
+        if warp_active_in_tick {
+          saw_warp_context = true
+        }
+        if vm.redraw_requested_while_warp {
+          saw_warp_context = true
+        }
+        if saw_warp_context && !has_active_warp_thread(vm) {
+          stop_reason = "warp-exit"
+          should_render = true
+          vm.redraw_requested = false
+          vm.redraw_requested_while_warp = false
+          warp_exit_detected = true
+          break
+        }
+      }
+
+      total_ticks += 1
+      cleanup_done_threads(vm)
+
+      if warp_exit_detected {
+        break
+      }
+
+      if vm.threads.length() <= 0 {
+        stop_reason = "finished"
+        should_render = true
+        break
+      }
+
+      if warp_active_in_tick {
+        saw_warp_context = true
+      }
+      let warp_active_after_tick = has_active_warp_thread(vm)
+      if vm.redraw_requested_while_warp {
+        saw_warp_context = true
+      }
+      if saw_warp_context && !warp_active_after_tick {
+        stop_reason = "warp-exit"
+        should_render = true
+        vm.redraw_requested = false
+        vm.redraw_requested_while_warp = false
+        break
+      }
+
+      if vm.redraw_requested &&
+        !vm.options.turbo &&
+        !warp_active_in_tick &&
+        !vm.redraw_requested_while_warp &&
+        !warp_active_after_tick {
+        stop_reason = "rerender"
+        should_render = true
+        vm.redraw_requested = false
+        vm.redraw_requested_while_warp = false
+        break
+      }
+
+      if !progressed {
+        stop_reason = "timeout"
+        break
+      }
     }
   }
 
   cleanup_done_threads(vm)
+  if vm.threads.length() <= 0 {
+    vm.running = false
+    if stop_reason != "warp-exit" {
+      stop_reason = "finished"
+    }
+    should_render = true
+    vm.redraw_requested = false
+    vm.redraw_requested_while_warp = false
+  } else if stop_reason != "rerender" &&
+    stop_reason != "warp-exit" &&
+    stop_reason != "finished" {
+    stop_reason = "timeout"
+    should_render = false
+  }
+
+  vm.io_prev_state = copy_json_map(vm.io_state)
 
   {
-    now_ms: vm.now_ms,
     active_threads: vm.threads.length(),
-    stepped_threads: stepped,
+    tick_count: total_ticks,
+    op_count: total_ops,
     emitted_effects: vm.effects.length(),
+    stop_reason,
+    should_render,
+    is_in_warp: has_active_warp_thread(vm),
   }
 }

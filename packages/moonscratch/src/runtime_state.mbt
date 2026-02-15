@@ -1,22 +1,13 @@
 ///|
-fn vm_new_internal(
-  bundle : ProjectBundle,
-  options : VmOptions,
-) -> Vm raise VmError {
-  let (targets, stage_index) = parse_project_targets(
-    bundle.project_json,
-    bundle.assets,
-  )
+fn vm_new_internal(precompiled : PrecompiledProject, options : VmOptions) -> Vm {
+  let targets = instantiate_targets(precompiled.targets)
   let pen_width = if options.pen_width > 0 { options.pen_width } else { 480 }
   let pen_height = if options.pen_height > 0 { options.pen_height } else { 360 }
   let pen_pixels = []
-  for _ in 0..<(pen_width * pen_height * 4) {
-    pen_pixels.push(b'\x00')
-  }
   {
     targets,
-    stage_index,
-    assets: bundle.assets,
+    stage_index: precompiled.stage_index,
+    assets: precompiled.assets,
     options,
     pen_width,
     pen_height,
@@ -29,9 +20,11 @@ fn vm_new_internal(
     answer: "",
     effects: [],
     io_state: {},
+    io_prev_state: {},
     waiting_children: {},
     rng_state: options.seed,
     control_counter: 0,
+    hot_op_counts: {},
     next_clone_id: 1,
     hat_predicates: {},
     timer_start_ms: 0,
@@ -39,7 +32,15 @@ fn vm_new_internal(
     tts_language: "en",
     procedure_frames: {},
     pending_translate_requests: {},
+    redraw_requested: false,
+    redraw_requested_while_warp: false,
     current_thread_id: None,
+    mathop_sin_cache_valid: false,
+    mathop_sin_cache_input: 0.0,
+    mathop_sin_cache_output: 0.0,
+    mathop_cos_cache_valid: false,
+    mathop_cos_cache_input: 0.0,
+    mathop_cos_cache_output: 0.0,
   }
 }
 
@@ -79,34 +80,56 @@ fn resolve_variable_ref(
   target_index : Int,
   variable_id : String?,
   variable_name : String?,
-) -> (Int, String)? {
+) -> (Int, String, Int?)? {
   let target = vm.targets[target_index]
   let stage = vm.targets[vm.stage_index]
 
   match variable_id {
-    Some(id) => {
-      if target.variables.contains(id) {
-        return Some((target_index, id))
-      }
-      if stage.variables.contains(id) {
-        return Some((vm.stage_index, id))
-      }
-      None
-    }
+    Some(id) => resolve_variable_ref_by_id(vm, target_index, id)
     None =>
       match variable_name {
         Some(name) =>
           match target.variable_names.get(name) {
-            Some(id) => Some((target_index, id))
+            Some(id) =>
+              Some((target_index, id, target.variable_slot_by_name.get(name)))
             None =>
               match stage.variable_names.get(name) {
-                Some(id) => Some((vm.stage_index, id))
+                Some(id) =>
+                  Some(
+                    (vm.stage_index, id, stage.variable_slot_by_name.get(name)),
+                  )
                 None => None
               }
           }
         None => None
       }
   }
+}
+
+///|
+fn resolve_variable_ref_by_id(
+  vm : Vm,
+  target_index : Int,
+  variable_id : String,
+) -> (Int, String, Int?)? {
+  let target = vm.targets[target_index]
+  let stage = vm.targets[vm.stage_index]
+
+  match target.variable_slot_by_id.get(variable_id) {
+    Some(slot) => return Some((target_index, variable_id, Some(slot)))
+    None => ()
+  }
+  if target.variables.contains(variable_id) {
+    return Some((target_index, variable_id, None))
+  }
+  match stage.variable_slot_by_id.get(variable_id) {
+    Some(slot) => return Some((vm.stage_index, variable_id, Some(slot)))
+    None => ()
+  }
+  if stage.variables.contains(variable_id) {
+    return Some((vm.stage_index, variable_id, None))
+  }
+  None
 }
 
 ///|
@@ -117,9 +140,55 @@ fn read_variable(
   variable_name : String?,
 ) -> Json {
   match resolve_variable_ref(vm, target_index, variable_id, variable_name) {
-    Some((owner_index, id)) =>
-      vm.targets[owner_index].variables.get_or_default(id, Json::null())
+    Some((owner_index, id, slot)) =>
+      read_variable_by_ref(vm, owner_index, id, slot)
     None => Json::null()
+  }
+}
+
+///|
+fn read_variable_by_ref(
+  vm : Vm,
+  owner_index : Int,
+  variable_id : String,
+  slot : Int?,
+) -> Json {
+  match slot {
+    Some(slot) =>
+      if slot >= 0 && slot < vm.targets[owner_index].variable_values.length() {
+        vm.targets[owner_index].variable_values[slot]
+      } else {
+        vm.targets[owner_index].variables.get_or_default(
+          variable_id,
+          Json::null(),
+        )
+      }
+    None =>
+      vm.targets[owner_index].variables.get_or_default(
+        variable_id,
+        Json::null(),
+      )
+  }
+}
+
+///|
+fn write_variable_by_ref(
+  vm : Vm,
+  owner_index : Int,
+  variable_id : String,
+  slot : Int?,
+  value : Json,
+) -> Unit {
+  vm.targets[owner_index].variables[variable_id] = value
+  match slot {
+    Some(slot) =>
+      if slot >= 0 && slot < vm.targets[owner_index].variable_values.length() {
+        vm.targets[owner_index].variable_values[slot] = value
+        vm.targets[owner_index].variable_numeric_flags[slot] = json_is_numeric_comparable(
+          value,
+        )
+      }
+    None => ()
   }
 }
 
@@ -132,14 +201,23 @@ fn write_variable(
   value : Json,
 ) -> Unit {
   match resolve_variable_ref(vm, target_index, variable_id, variable_name) {
-    Some((owner_index, id)) => vm.targets[owner_index].variables[id] = value
+    Some((owner_index, id, slot)) =>
+      write_variable_by_ref(vm, owner_index, id, slot, value)
     None =>
       match variable_name {
         Some(name) => {
           let stage_index = vm.stage_index
           let new_id = "stage_var_\{name}"
+          let new_slot = vm.targets[stage_index].variable_values.length()
           vm.targets[stage_index].variables[new_id] = value
           vm.targets[stage_index].variable_names[name] = new_id
+          vm.targets[stage_index].variable_slot_by_id[new_id] = new_slot
+          vm.targets[stage_index].variable_slot_by_name[name] = new_slot
+          vm.targets[stage_index].variable_id_by_slot.push(new_id)
+          vm.targets[stage_index].variable_values.push(value)
+          vm.targets[stage_index].variable_numeric_flags.push(
+            json_is_numeric_comparable(value),
+          )
         }
         None => ()
       }
@@ -152,17 +230,25 @@ fn resolve_list_ref(
   target_index : Int,
   list_id : String?,
   list_name : String?,
-) -> (Int, String)? {
+) -> (Int, String, Int?)? {
   let target = vm.targets[target_index]
   let stage = vm.targets[vm.stage_index]
 
   match list_id {
     Some(id) => {
+      match target.list_slot_by_id.get(id) {
+        Some(slot) => return Some((target_index, id, Some(slot)))
+        None => ()
+      }
       if target.lists.contains(id) {
-        return Some((target_index, id))
+        return Some((target_index, id, None))
+      }
+      match stage.list_slot_by_id.get(id) {
+        Some(slot) => return Some((vm.stage_index, id, Some(slot)))
+        None => ()
       }
       if stage.lists.contains(id) {
-        return Some((vm.stage_index, id))
+        return Some((vm.stage_index, id, None))
       }
       None
     }
@@ -170,10 +256,12 @@ fn resolve_list_ref(
       match list_name {
         Some(name) =>
           match target.list_names.get(name) {
-            Some(id) => Some((target_index, id))
+            Some(id) =>
+              Some((target_index, id, target.list_slot_by_name.get(name)))
             None =>
               match stage.list_names.get(name) {
-                Some(id) => Some((vm.stage_index, id))
+                Some(id) =>
+                  Some((vm.stage_index, id, stage.list_slot_by_name.get(name)))
                 None => None
               }
           }
@@ -190,9 +278,44 @@ fn read_list(
   list_name : String?,
 ) -> Array[Json] {
   match resolve_list_ref(vm, target_index, list_id, list_name) {
-    Some((owner_index, id)) =>
-      vm.targets[owner_index].lists.get_or_default(id, [])
+    Some((owner_index, id, slot)) => read_list_by_ref(vm, owner_index, id, slot)
     None => []
+  }
+}
+
+///|
+fn read_list_by_ref(
+  vm : Vm,
+  owner_index : Int,
+  list_id : String,
+  slot : Int?,
+) -> Array[Json] {
+  match slot {
+    Some(slot) =>
+      if slot >= 0 && slot < vm.targets[owner_index].list_values.length() {
+        vm.targets[owner_index].list_values[slot]
+      } else {
+        vm.targets[owner_index].lists.get_or_default(list_id, [])
+      }
+    None => vm.targets[owner_index].lists.get_or_default(list_id, [])
+  }
+}
+
+///|
+fn write_list_by_ref(
+  vm : Vm,
+  owner_index : Int,
+  list_id : String,
+  slot : Int?,
+  value : Array[Json],
+) -> Unit {
+  vm.targets[owner_index].lists[list_id] = value
+  match slot {
+    Some(slot) =>
+      if slot >= 0 && slot < vm.targets[owner_index].list_values.length() {
+        vm.targets[owner_index].list_values[slot] = value
+      }
+    None => ()
   }
 }
 
@@ -202,7 +325,7 @@ fn with_list_mut(
   target_index : Int,
   list_id : String?,
   list_name : String?,
-) -> (Int, String)? {
+) -> (Int, String, Int?)? {
   match resolve_list_ref(vm, target_index, list_id, list_name) {
     Some(pair) => Some(pair)
     None =>
@@ -210,9 +333,14 @@ fn with_list_mut(
         Some(name) => {
           let stage_index = vm.stage_index
           let created = "stage_list_\{name}"
+          let new_slot = vm.targets[stage_index].list_values.length()
           vm.targets[stage_index].lists[created] = []
           vm.targets[stage_index].list_names[name] = created
-          Some((stage_index, created))
+          vm.targets[stage_index].list_slot_by_id[created] = new_slot
+          vm.targets[stage_index].list_slot_by_name[name] = new_slot
+          vm.targets[stage_index].list_id_by_slot.push(created)
+          vm.targets[stage_index].list_values.push([])
+          Some((stage_index, created, Some(new_slot)))
         }
         None => None
       }
@@ -234,8 +362,32 @@ fn copy_string_map(source : Map[String, String]) -> Map[String, String] {
 }
 
 ///|
+fn copy_int_map(source : Map[String, Int]) -> Map[String, Int] {
+  let out = {}
+  source.each((key, value) => out[key] = value)
+  out
+}
+
+///|
+fn copy_double_map(source : Map[String, Double]) -> Map[String, Double] {
+  let out = {}
+  source.each((key, value) => out[key] = value)
+  out
+}
+
+///|
 fn copy_string_array(source : Array[String]) -> Array[String] {
   source.copy()
+}
+
+///|
+fn copy_json_array(source : Array[Json]) -> Array[Json] {
+  source.copy()
+}
+
+///|
+fn copy_nested_json_array(source : Array[Array[Json]]) -> Array[Array[Json]] {
+  source.map(fn(values) { values.copy() })
 }
 
 ///|
@@ -255,34 +407,35 @@ fn copy_block_map(
 }
 
 ///|
-fn active_clone_count(vm : Vm) -> Int {
-  let mut count = 0
-  for target in vm.targets {
-    if !target.is_stage && !target.is_original && !target.deleted {
-      count += 1
+fn copy_procedure_map(
+  source : Map[String, ProcedureSpec],
+) -> Map[String, ProcedureSpec] {
+  let out = {}
+  source.each((key, value) => {
+    out[key] = {
+      start_block: value.start_block,
+      param_names: value.param_names.copy(),
+      param_ids: value.param_ids.copy(),
+      param_defaults: value.param_defaults.copy(),
+      warp_mode: value.warp_mode,
     }
-  }
-  count
+  })
+  out
 }
 
 ///|
-fn find_reusable_clone_slot(vm : Vm) -> Int? {
-  for i, target in vm.targets {
-    if !target.is_stage && !target.is_original && target.deleted {
-      return Some(i)
-    }
-  }
-  None
-}
-
-///|
-fn clone_target_state(source : TargetState, clone_id : Int) -> TargetState {
+fn copy_target_state_with_meta(
+  source : TargetState,
+  id : String,
+  is_original : Bool,
+  deleted : Bool,
+) -> TargetState {
   {
-    id: "\{source.id}#clone_\{clone_id}",
+    id,
     name: source.name,
     is_stage: source.is_stage,
-    is_original: false,
-    deleted: false,
+    is_original,
+    deleted,
     x: source.x,
     y: source.y,
     direction: source.direction,
@@ -310,11 +463,86 @@ fn clone_target_state(source : TargetState, clone_id : Int) -> TargetState {
     looks_effect_ghost: source.looks_effect_ghost,
     variables: copy_json_map(source.variables),
     variable_names: copy_string_map(source.variable_names),
+    variable_slot_by_id: copy_int_map(source.variable_slot_by_id),
+    variable_slot_by_name: copy_int_map(source.variable_slot_by_name),
+    variable_id_by_slot: source.variable_id_by_slot.copy(),
+    variable_values: copy_json_array(source.variable_values),
+    variable_numeric_flags: source.variable_numeric_flags.copy(),
     lists: copy_list_map(source.lists),
     list_names: copy_string_map(source.list_names),
+    list_slot_by_id: copy_int_map(source.list_slot_by_id),
+    list_slot_by_name: copy_int_map(source.list_slot_by_name),
+    list_id_by_slot: source.list_id_by_slot.copy(),
+    list_values: copy_nested_json_array(source.list_values),
     blocks: copy_block_map(source.blocks),
+    const_number_block_values: copy_double_map(source.const_number_block_values),
+    procedures: copy_procedure_map(source.procedures),
+    block_pc_by_id: copy_int_map(source.block_pc_by_id),
+    blocks_by_pc: source.blocks_by_pc.copy(),
+    block_fast_meta_by_pc: source.block_fast_meta_by_pc.copy(),
+    numeric_program_cache: {},
+    numeric_program_compile_failed: {},
+    bool_program_cache: {},
+    bool_program_compile_failed: {},
     top_level_hats: source.top_level_hats.copy(),
+    green_flag_starts: source.green_flag_starts.copy(),
+    stage_clicked_starts: source.stage_clicked_starts.copy(),
+    sprite_clicked_starts: source.sprite_clicked_starts.copy(),
+    clone_start_starts: source.clone_start_starts.copy(),
+    key_pressed_hats: source.key_pressed_hats.copy(),
+    broadcast_hats: source.broadcast_hats.copy(),
+    backdrop_hats: source.backdrop_hats.copy(),
+    predicate_hats: source.predicate_hats.copy(),
   }
+}
+
+///|
+fn instantiate_targets(
+  source_targets : Array[TargetState],
+) -> Array[TargetState] {
+  let targets = []
+  for source in source_targets {
+    targets.push(
+      copy_target_state_with_meta(
+        source,
+        source.id,
+        source.is_original,
+        source.deleted,
+      ),
+    )
+  }
+  targets
+}
+
+///|
+fn active_clone_count(vm : Vm) -> Int {
+  let mut count = 0
+  for target in vm.targets {
+    if !target.is_stage && !target.is_original && !target.deleted {
+      count += 1
+    }
+  }
+  count
+}
+
+///|
+fn find_reusable_clone_slot(vm : Vm) -> Int? {
+  for i, target in vm.targets {
+    if !target.is_stage && !target.is_original && target.deleted {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn clone_target_state(source : TargetState, clone_id : Int) -> TargetState {
+  copy_target_state_with_meta(
+    source,
+    "\{source.id}#clone_\{clone_id}",
+    false,
+    false,
+  )
 }
 
 ///|
@@ -386,15 +614,25 @@ fn spawn_thread(
   start_block : String,
   parent_waiter : Int?,
 ) -> Unit {
+  if target_index < 0 || target_index >= vm.targets.length() {
+    return
+  }
+  let start_pc = match
+    vm.targets[target_index].block_pc_by_id.get(start_block) {
+    Some(pc) => pc
+    None => return
+  }
   let thread_id = vm.next_thread_id
   vm.next_thread_id += 1
   let thread : Thread = {
     id: thread_id,
     target_index,
-    pc: Some(start_block),
+    pc: Some(start_pc),
     wait_until_ms: None,
     wait_for_input: None,
     done: false,
+    warp_mode: false,
+    warp_started_ms: 0,
     stack: [],
     loop_counters: {},
     parent_waiter,
@@ -408,6 +646,7 @@ fn clear_threads(vm : Vm) -> Unit {
   vm.waiting_children.clear()
   vm.procedure_frames.clear()
   vm.current_thread_id = None
+  vm.redraw_requested_while_warp = false
   vm.running = false
 }
 
