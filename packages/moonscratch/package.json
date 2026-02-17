@@ -2,10 +2,22 @@
   "name": "moonscratch",
   "type": "module",
   "module": "js/index.ts",
+  "version": "0.1.0",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    }
+  },
+  "repository": {
+    "url": "https://github.com/pnsk-lab/hikkaku",
+    "type": "git",
+    "directory": "packages/moonscratch"
+  },
   "scripts": {
     "test": "moon build --target js && moon test && vp test run",
     "bench": "bun benchmarks/run.bench.ts",
-    "build": "moon build --target js && vp pack",
+    "build": "moon build --target js --release && vp pack",
     "typecheck": "tsgo",
     "preinstall": "bun ./scripts/preinstall.ts"
   },
